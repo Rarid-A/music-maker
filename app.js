@@ -12,6 +12,10 @@ let mediaStreamDestination = null;
 let channelIdCounter = 1;
 
 const keyboardMap = {'a':'C4','w':'C#4','s':'D4','e':'D#4','d':'E4','f':'F4','t':'F#4','g':'G4','y':'G#4','h':'A4','u':'A#4','j':'B4','k':'C5'};
+const notes = ['C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4', 'C#4', 'C4'];
+const drumLabels = ['kick', 'snare', 'hihat', 'clap'];
+let sequencerLoop = null;
+let currentStep = 0;
 
 async function startAudio() {
     if (audioStarted) return;
@@ -44,17 +48,71 @@ function init() {
     setupEventListeners();
 }
 
-function addChannel(name, waveType = 'sine') {
+function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
     const id = channelIdCounter++;
-    const synth = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: waveType },
-        envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.2 }
-    });
-    synth.toDestination();
-    if (mediaStreamDestination) synth.connect(mediaStreamDestination);
-    synth.volume.value = -10;
+    let instrument;
     
-    const channel = { id, name, synth, waveType, volume: 0.7, muted: false, attack: 10, release: 200 };
+    // Create different instrument types
+    if (instrumentType === 'drums') {
+        // Create drum machine with individual drum sounds
+        instrument = {
+            kick: new Tone.MembraneSynth().toDestination(),
+            snare: new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.2 } }).toDestination(),
+            hihat: new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).toDestination(),
+            clap: new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.15 } }).toDestination()
+        };
+        // Connect to media stream
+        if (mediaStreamDestination) {
+            instrument.kick.connect(mediaStreamDestination);
+            instrument.snare.connect(mediaStreamDestination);
+            instrument.hihat.connect(mediaStreamDestination);
+            instrument.clap.connect(mediaStreamDestination);
+        }
+    } else if (instrumentType === 'bass') {
+        instrument = new Tone.MonoSynth({
+            oscillator: { type: 'sawtooth' },
+            envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.1 },
+            filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.2, baseFrequency: 200, octaves: 2.6 }
+        }).toDestination();
+        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
+        instrument.volume.value = -10;
+    } else if (instrumentType === 'pad') {
+        instrument = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.8, decay: 0.5, sustain: 0.8, release: 2.0 }
+        }).toDestination();
+        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
+        instrument.volume.value = -15;
+    } else if (instrumentType === 'pluck') {
+        instrument = new Tone.PluckSynth({
+            attackNoise: 1,
+            dampening: 4000,
+            resonance: 0.7
+        }).toDestination();
+        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
+        instrument.volume.value = -10;
+    } else {
+        // Default synth
+        instrument = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: waveType },
+            envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.2 }
+        }).toDestination();
+        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
+        instrument.volume.value = -10;
+    }
+    
+    const channel = { 
+        id, 
+        name, 
+        synth: instrument, 
+        instrumentType,
+        waveType, 
+        volume: 0.7, 
+        muted: false, 
+        attack: 10, 
+        release: 200,
+        pattern: Array(16).fill(null).map(() => ({})) // 16-step pattern
+    };
     channels.push(channel);
     renderChannels();
     renderMixerChannels();
@@ -63,12 +121,79 @@ function addChannel(name, waveType = 'sine') {
 }
 
 function selectChannel(id) {
+    selectedChannel = id;
     selectedChannelId = id;
     renderChannels();
+    renderSequencerGrid();
 }
 
 function getSelectedChannel() {
     return channels.find(ch => ch.id === selectedChannelId);
+}
+
+function playNote(channel, note, time = undefined) {
+    if (channel.instrumentType === 'drums') {
+        return; // Drums don't play notes
+    }
+    
+    if (channel.instrumentType === 'bass' || channel.instrumentType === 'pluck') {
+        channel.synth.triggerAttackRelease(note, '8n', time);
+    } else {
+        channel.synth.triggerAttackRelease(note, '8n', time);
+    }
+}
+
+function playDrum(channel, drumType, time = undefined) {
+    if (channel.instrumentType !== 'drums') return;
+    
+    switch(drumType) {
+        case 'kick':
+            channel.synth.kick.triggerAttackRelease('C1', '8n', time);
+            break;
+        case 'snare':
+            channel.synth.snare.triggerAttack(time);
+            break;
+        case 'hihat':
+            channel.synth.hihat.triggerAttackRelease('16n', time);
+            break;
+        case 'clap':
+            channel.synth.clap.triggerAttack(time);
+            break;
+    }
+}
+
+function showInstrumentDialog() {
+    const instrumentType = prompt(
+        'Choose instrument type:\n\n' +
+        '1 - Synth (Lead/Melody)\n' +
+        '2 - Bass\n' +
+        '3 - Pad (Ambient)\n' +
+        '4 - Pluck (Guitar-like)\n' +
+        '5 - Drums\n\n' +
+        'Enter number (1-5):',
+        '1'
+    );
+    
+    if (!instrumentType) return;
+    
+    const types = {
+        '1': { type: 'synth', name: 'Lead' },
+        '2': { type: 'bass', name: 'Bass' },
+        '3': { type: 'pad', name: 'Pad' },
+        '4': { type: 'pluck', name: 'Pluck' },
+        '5': { type: 'drums', name: 'Drums' }
+    };
+    
+    const selected = types[instrumentType];
+    if (!selected) {
+        alert('Invalid choice');
+        return;
+    }
+    
+    const name = prompt('Channel name:', `${selected.name} ${channels.length + 1}`);
+    if (name) {
+        addChannel(name, selected.type, 'sine');
+    }
 }
 
 function updateChannel(id, property, value) {
@@ -76,14 +201,32 @@ function updateChannel(id, property, value) {
     if (!channel) return;
     channel[property] = value;
     
-    if (property === 'waveType') {
-        channel.synth.set({ oscillator: { type: value } });
-    } else if (property === 'volume') {
-        channel.synth.volume.value = -20 + (value * 20);
-    } else if (property === 'muted') {
-        channel.synth.volume.value = value ? -Infinity : -20 + (channel.volume * 20);
-    } else if (property === 'attack' || property === 'release') {
-        channel.synth.set({ envelope: { attack: channel.attack / 1000, release: channel.release / 1000 } });
+    if (channel.instrumentType === 'drums') {
+        // Handle drum channels differently
+        if (property === 'volume') {
+            const volumeValue = -20 + (value * 20);
+            channel.synth.kick.volume.value = volumeValue;
+            channel.synth.snare.volume.value = volumeValue;
+            channel.synth.hihat.volume.value = volumeValue;
+            channel.synth.clap.volume.value = volumeValue;
+        } else if (property === 'muted') {
+            const volumeValue = value ? -Infinity : -20 + (channel.volume * 20);
+            channel.synth.kick.volume.value = volumeValue;
+            channel.synth.snare.volume.value = volumeValue;
+            channel.synth.hihat.volume.value = volumeValue;
+            channel.synth.clap.volume.value = volumeValue;
+        }
+    } else {
+        // Handle regular instrument channels
+        if (property === 'waveType') {
+            channel.synth.set({ oscillator: { type: value } });
+        } else if (property === 'volume') {
+            channel.synth.volume.value = -20 + (value * 20);
+        } else if (property === 'muted') {
+            channel.synth.volume.value = value ? -Infinity : -20 + (channel.volume * 20);
+        } else if (property === 'attack' || property === 'release') {
+            channel.synth.set({ envelope: { attack: channel.attack / 1000, release: channel.release / 1000 } });
+        }
     }
     renderMixerChannels();
 }
@@ -106,15 +249,20 @@ function renderChannels() {
         const div = document.createElement('div');
         div.className = `channel-item ${channel.id === selectedChannelId ? 'selected' : ''}`;
         div.onclick = () => selectChannel(channel.id);
-        div.innerHTML = `
-            <div class="channel-header">
-                <div class="channel-name-display">${channel.name}</div>
-                <button class="channel-btn" onclick="event.stopPropagation(); removeChannel(${channel.id})"></button>
+        
+        // Show different settings based on instrument type
+        const settingsHTML = channel.instrumentType === 'drums' ? `
+            <div class="channel-settings">
+                <div class="setting-item" style="grid-column: 1 / -1;">
+                    <label>Drums</label>
+                    <div style="font-size: 0.75em; color: #888;">Kick, Snare, HiHat, Clap</div>
+                </div>
             </div>
+        ` : `
             <div class="channel-settings">
                 <div class="setting-item">
-                    <label>Wave</label>
-                    <select onchange="updateChannel(${channel.id}, 'waveType', this.value)">
+                    <label>Type</label>
+                    <select onchange="updateChannel(${channel.id}, 'waveType', this.value)" onclick="event.stopPropagation()" ${channel.instrumentType !== 'synth' ? 'disabled' : ''}>
                         <option value="sine" ${channel.waveType==='sine'?'selected':''}>Sine</option>
                         <option value="square" ${channel.waveType==='square'?'selected':''}>Square</option>
                         <option value="triangle" ${channel.waveType==='triangle'?'selected':''}>Triangle</option>
@@ -124,9 +272,17 @@ function renderChannels() {
                 <div class="setting-item">
                     <label>Attack</label>
                     <input type="range" min="0" max="500" value="${channel.attack}" step="10" 
-                           onchange="updateChannel(${channel.id}, 'attack', parseInt(this.value))">
+                           onchange="updateChannel(${channel.id}, 'attack', parseInt(this.value))" onclick="event.stopPropagation()">
                 </div>
             </div>
+        `;
+        
+        div.innerHTML = `
+            <div class="channel-header">
+                <div class="channel-name-display">${channel.name} <span style="font-size:0.8em;color:#888;">[${channel.instrumentType}]</span></div>
+                <button class="channel-btn" onclick="event.stopPropagation(); removeChannel(${channel.id})">✕</button>
+            </div>
+            ${settingsHTML}
         `;
         channelsList.appendChild(div);
     });
@@ -153,11 +309,106 @@ function renderMixerChannels() {
     });
 }
 
+function renderSequencerGrid() {
+    const grid = document.getElementById('sequencerGrid');
+    if (!grid || !selectedChannel) return;
+    
+    grid.innerHTML = '';
+    const channel = channels.find(c => c.id === selectedChannel);
+    if (!channel) return;
+    
+    document.getElementById('selectedChannelName').textContent = channel.name;
+    
+    const rowLabels = channel.instrumentType === 'drums' ? drumLabels : notes;
+    
+    rowLabels.forEach((label, rowIndex) => {
+        const row = document.createElement('div');
+        row.className = 'sequencer-row';
+        
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'sequencer-label';
+        // Capitalize first letter for drums
+        labelDiv.textContent = channel.instrumentType === 'drums' 
+            ? label.charAt(0).toUpperCase() + label.slice(1) 
+            : label;
+        row.appendChild(labelDiv);
+        
+        for (let stepIndex = 0; stepIndex < 16; stepIndex++) {
+            const step = document.createElement('div');
+            step.className = 'sequencer-step';
+            if (stepIndex % 4 === 0) step.classList.add('beat');
+            
+            const isActive = channel.pattern[stepIndex][label];
+            if (isActive) step.classList.add('active');
+            
+            step.addEventListener('click', () => {
+                channel.pattern[stepIndex][label] = !channel.pattern[stepIndex][label];
+                step.classList.toggle('active');
+            });
+            
+            row.appendChild(step);
+        }
+        
+        grid.appendChild(row);
+    });
+}
+
+function startSequencer() {
+    if (sequencerLoop) return;
+    
+    currentStep = 0;
+    sequencerLoop = new Tone.Loop((time) => {
+        channels.forEach(channel => {
+            const step = channel.pattern[currentStep];
+            if (channel.instrumentType === 'drums') {
+                drumLabels.forEach(drumType => {
+                    if (step[drumType]) {
+                        playDrum(channel, drumType, time);
+                    }
+                });
+            } else {
+                notes.forEach(note => {
+                    if (step[note]) {
+                        playNote(channel, note, time);
+                    }
+                });
+            }
+        });
+        
+        // Visual feedback
+        Tone.Draw.schedule(() => {
+            document.querySelectorAll('.sequencer-step').forEach((el, index) => {
+                const stepPos = index % 16;
+                if (stepPos === currentStep) {
+                    el.style.borderColor = '#667eea';
+                } else {
+                    el.style.borderColor = '#333';
+                }
+            });
+        }, time);
+        
+        currentStep = (currentStep + 1) % 16;
+    }, '16n');
+    
+    sequencerLoop.start(0);
+}
+
+function stopSequencer() {
+    if (sequencerLoop) {
+        sequencerLoop.stop();
+        sequencerLoop.dispose();
+        sequencerLoop = null;
+    }
+    currentStep = 0;
+    document.querySelectorAll('.sequencer-step').forEach(el => {
+        el.style.borderColor = '#333';
+    });
+}
+
 function setupEventListeners() {
     document.getElementById('addChannelBtn')?.addEventListener('click', async () => {
         await startAudio();
-        const name = prompt('Channel name:', `Channel ${channels.length + 1}`);
-        if (name) addChannel(name, 'sine');
+        showInstrumentDialog();
     });
     
     document.getElementById('tempoInput')?.addEventListener('input', (e) => {
@@ -183,7 +434,7 @@ function setupEventListeners() {
             const note = key.getAttribute('data-note');
             const channel = getSelectedChannel();
             if (note && channel) {
-                channel.synth.triggerAttackRelease(note, '8n');
+                playNote(channel, note);
                 key.classList.add('active');
                 setTimeout(() => key.classList.remove('active'), 200);
             }
@@ -191,17 +442,25 @@ function setupEventListeners() {
     });
     
     const pressedKeys = new Set();
+    const drumKeys = { 'z': 'kick', 'x': 'snare', 'c': 'hihat', 'v': 'clap' };
+    
     document.addEventListener('keydown', async (e) => {
         if (e.code === 'Space') { e.preventDefault(); togglePlay(); return; }
         const key = e.key.toLowerCase();
         if (pressedKeys.has(key)) return;
         pressedKeys.add(key);
-        const note = keyboardMap[key];
-        if (note) {
-            await startAudio();
-            const channel = getSelectedChannel();
-            if (channel && !channel.muted) {
-                channel.synth.triggerAttackRelease(note, '8n');
+        
+        await startAudio();
+        const channel = getSelectedChannel();
+        if (!channel || channel.muted) return;
+        
+        // Check if it's a drum key
+        if (drumKeys[key] && channel.instrumentType === 'drums') {
+            playDrum(channel, drumKeys[key]);
+        } else {
+            const note = keyboardMap[key];
+            if (note) {
+                playNote(channel, note);
                 document.querySelector(`[data-note="${note}"]`)?.classList.add('active');
             }
         }
@@ -224,15 +483,18 @@ async function togglePlay() {
     await startAudio();
     if (isPlaying) {
         Tone.Transport.pause();
+        stopSequencer();
         isPlaying = false;
     } else {
         Tone.Transport.start();
+        startSequencer();
         isPlaying = true;
     }
 }
 
 function stop() {
     Tone.Transport.stop();
+    stopSequencer();
     isPlaying = false;
 }
 
