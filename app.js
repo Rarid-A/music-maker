@@ -25,7 +25,7 @@ async function startAudio() {
         await Tone.start();
         audioStarted = true;
         setupRecording();
-        addChannel('Lead', 'sine');
+        addChannel('Lead', 'synth', 'sine'); // Fixed: instrumentType='synth', waveType='sine'
         console.log('Audio started');
     } catch (error) {
         alert('Error starting audio: ' + error.message);
@@ -267,11 +267,26 @@ window.updateChannel = updateChannel;
 function removeChannel(id) {
     const index = channels.findIndex(ch => ch.id === id);
     if (index === -1) return;
-    channels[index].synth.dispose();
+    
+    const channel = channels[index];
+    
+    // Dispose instruments properly based on type
+    if (channel.instrumentType === 'drums') {
+        // Drums have multiple synths
+        channel.synth.kick.dispose();
+        channel.synth.snare.dispose();
+        channel.synth.hihat.dispose();
+        channel.synth.clap.dispose();
+    } else {
+        // Regular instruments have a single synth
+        channel.synth.dispose();
+    }
+    
     channels.splice(index, 1);
     if (selectedChannelId === id && channels.length > 0) selectedChannelId = channels[0].id;
     renderChannels();
     renderMixerChannels();
+    renderSequencerGrid();
 }
 
 // Make removeChannel available globally for inline event handlers
@@ -298,7 +313,7 @@ function renderChannels() {
             <div class="channel-settings">
                 <div class="setting-item">
                     <label>Type</label>
-                    <select onchange="updateChannel(${channel.id}, 'waveType', this.value)" onclick="event.stopPropagation()" ${channel.instrumentType !== 'synth' ? 'disabled' : ''}>
+                    <select onchange="updateChannel(${channel.id}, 'waveType', this.value)" onclick="event.stopPropagation()" ${(channel.instrumentType === 'synth' || channel.instrumentType === 'pad') ? '' : 'disabled'}>
                         <option value="sine" ${channel.waveType==='sine'?'selected':''}>Sine</option>
                         <option value="square" ${channel.waveType==='square'?'selected':''}>Square</option>
                         <option value="triangle" ${channel.waveType==='triangle'?'selected':''}>Triangle</option>
