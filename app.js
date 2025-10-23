@@ -340,6 +340,69 @@ function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
         }).toDestination();
         if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
         instrument.volume.value = -10;
+    } else if (instrumentType === 'acidbass') {
+        // TB-303 style acid bass for techno
+        instrument = new Tone.MonoSynth({
+            oscillator: { type: 'sawtooth' },
+            envelope: { attack: 0.001, decay: 0.1, sustain: 0.0, release: 0.01 },
+            filter: { Q: 15, type: 'lowpass', rolloff: -24 },
+            filterEnvelope: { 
+                attack: 0.001, 
+                decay: 0.15, 
+                sustain: 0.0, 
+                release: 0.1, 
+                baseFrequency: 50, 
+                octaves: 4.5,
+                exponent: 2
+            }
+        }).toDestination();
+        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
+        instrument.volume.value = -8;
+    } else if (instrumentType === 'fmsynth') {
+        // FM synthesis for lead sounds
+        instrument = new Tone.FMSynth({
+            harmonicity: 3,
+            modulationIndex: 10,
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.1 },
+            modulation: { type: 'square' },
+            modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.0, release: 0.1 }
+        }).toDestination();
+        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
+        instrument.volume.value = -12;
+    } else if (instrumentType === 'epiano') {
+        // Electric Piano for jazz
+        instrument = new Tone.PolySynth(Tone.FMSynth, {
+            harmonicity: 1.5,
+            modulationIndex: 2,
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.001, decay: 1.5, sustain: 0.0, release: 0.8 },
+            modulation: { type: 'sine' },
+            modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0.0, release: 0.5 }
+        }).toDestination();
+        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
+        instrument.volume.value = -8;
+    } else if (instrumentType === 'vibraphone') {
+        // Vibraphone for jazz
+        instrument = new Tone.PolySynth(Tone.FMSynth, {
+            harmonicity: 2,
+            modulationIndex: 1.5,
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.001, decay: 2.0, sustain: 0.3, release: 2.5 },
+            modulation: { type: 'sine' },
+            modulationEnvelope: { attack: 0.5, decay: 1.0, sustain: 0.2, release: 1.5 }
+        }).toDestination();
+        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
+        instrument.volume.value = -10;
+    } else if (instrumentType === 'uprightbass') {
+        // Upright/Double Bass for jazz
+        instrument = new Tone.MonoSynth({
+            oscillator: { type: 'triangle' },
+            envelope: { attack: 0.01, decay: 0.4, sustain: 0.2, release: 0.3 },
+            filterEnvelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.2, baseFrequency: 100, octaves: 1.5 }
+        }).toDestination();
+        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
+        instrument.volume.value = -6;
     } else if (instrumentType === 'pad') {
         instrument = new Tone.PolySynth(Tone.Synth, {
             oscillator: { type: 'sine' },
@@ -418,12 +481,23 @@ function playNote(channel, note, time = undefined) {
     }
     
     try {
-        if (channel.instrumentType === 'bass') {
+        if (channel.instrumentType === 'bass' || channel.instrumentType === 'acidbass' || channel.instrumentType === 'uprightbass') {
+            // Mono synths for bass sounds
             channel.synth.triggerAttackRelease(note, '8n', time);
         } else if (channel.instrumentType === 'pluck') {
             // Pluck needs a different duration for proper sound
             channel.synth.triggerAttackRelease(note, '4n', time);
+        } else if (channel.instrumentType === 'fmsynth') {
+            // FM synth with shorter duration for punchier sound
+            channel.synth.triggerAttackRelease(note, '16n', time);
+        } else if (channel.instrumentType === 'epiano') {
+            // Electric piano with medium sustain
+            channel.synth.triggerAttackRelease(note, '4n', time);
+        } else if (channel.instrumentType === 'vibraphone') {
+            // Vibraphone with long sustain
+            channel.synth.triggerAttackRelease(note, '2n', time);
         } else {
+            // Default synths and pads
             channel.synth.triggerAttackRelease(note, '8n', time);
         }
     } catch (error) {
@@ -471,9 +545,17 @@ function releaseAllNotes() {
                     if (channel.synth.clap && channel.synth.clap.noise) {
                         channel.synth.clap.noise.stop();
                     }
+                } else if (channel.instrumentType === 'pluck' || channel.instrumentType === 'bass' || 
+                           channel.instrumentType === 'acidbass' || channel.instrumentType === 'uprightbass') {
+                    // For monophonic instruments, use triggerRelease
+                    if (channel.synth.triggerRelease) {
+                        channel.synth.triggerRelease();
+                    }
                 } else {
-                    // For melodic instruments, release all notes
-                    channel.synth.releaseAll();
+                    // For polyphonic instruments, release all notes
+                    if (channel.synth.releaseAll) {
+                        channel.synth.releaseAll();
+                    }
                 }
             } catch (error) {
                 console.error('Error releasing notes for channel:', channel.name, error);
@@ -501,12 +583,20 @@ function showInstrumentDialog() {
     
     const instrumentType = prompt(
         '🎹 Choose instrument type:\n\n' +
+        'BASIC INSTRUMENTS:\n' +
         '1 - Synth (Lead/Melody)\n' +
         '2 - Bass (Deep sound)\n' +
         '3 - Pad (Ambient)\n' +
         '4 - Pluck (Guitar-like)\n' +
         '5 - Drums (Percussion)\n\n' +
-        'Enter number (1-5):',
+        'TECHNO/ELECTRONIC:\n' +
+        '6 - Acid Bass (TB-303 style)\n' +
+        '7 - FM Synth (Aggressive leads)\n\n' +
+        'JAZZ/ACOUSTIC:\n' +
+        '8 - Electric Piano\n' +
+        '9 - Vibraphone\n' +
+        '10 - Upright Bass\n\n' +
+        'Enter number (1-10):',
         '1'
     );
     
@@ -521,8 +611,8 @@ function showInstrumentDialog() {
     }
     
     // Validate input
-    if (!/^[1-5]$/.test(instrumentType.trim())) {
-        alert('Invalid choice. Please enter a number between 1 and 5.');
+    if (!/^([1-9]|10)$/.test(instrumentType.trim())) {
+        alert('Invalid choice. Please enter a number between 1 and 10.');
         // Resume playback if it was playing
         if (wasPlaying) {
             Tone.Transport.start();
@@ -537,7 +627,12 @@ function showInstrumentDialog() {
         '2': { type: 'bass', name: 'Bass' },
         '3': { type: 'pad', name: 'Pad' },
         '4': { type: 'pluck', name: 'Pluck' },
-        '5': { type: 'drums', name: 'Drums' }
+        '5': { type: 'drums', name: 'Drums' },
+        '6': { type: 'acidbass', name: 'Acid Bass' },
+        '7': { type: 'fmsynth', name: 'FM Synth' },
+        '8': { type: 'epiano', name: 'E-Piano' },
+        '9': { type: 'vibraphone', name: 'Vibraphone' },
+        '10': { type: 'uprightbass', name: 'Upright Bass' }
     };
     
     const selected = types[instrumentType.trim()];
@@ -666,8 +761,14 @@ function removeChannel(id) {
             if (channel.synth.clap && channel.synth.clap.noise) {
                 channel.synth.clap.noise.stop();
             }
+        } else if (channel.instrumentType === 'pluck' || channel.instrumentType === 'bass' || 
+                   channel.instrumentType === 'acidbass' || channel.instrumentType === 'uprightbass') {
+            // For monophonic instruments, use triggerRelease
+            if (channel.synth && channel.synth.triggerRelease) {
+                channel.synth.triggerRelease();
+            }
         } else {
-            // For melodic instruments, release all notes
+            // For polyphonic instruments, release all notes
             if (channel.synth && channel.synth.releaseAll) {
                 channel.synth.releaseAll();
             }
@@ -730,12 +831,42 @@ function renderChannels() {
         div.className = `channel-item ${channel.id === selectedChannelId ? 'selected' : ''}`;
         div.onclick = () => selectChannel(channel.id);
         
+        // Get display name for instrument type
+        const instrumentDisplayName = {
+            'synth': 'Synth',
+            'bass': 'Bass',
+            'acidbass': 'Acid Bass',
+            'fmsynth': 'FM Synth',
+            'epiano': 'E-Piano',
+            'vibraphone': 'Vibraphone',
+            'uprightbass': 'Upright Bass',
+            'pad': 'Pad',
+            'pluck': 'Pluck',
+            'drums': 'Drums'
+        }[channel.instrumentType] || channel.instrumentType;
+        
         // Show different settings based on instrument type
         const settingsHTML = channel.instrumentType === 'drums' ? `
             <div class="channel-settings">
                 <div class="setting-item" style="grid-column: 1 / -1;">
                     <label>Drums</label>
                     <div style="font-size: 0.75em; color: #888;">Kick, Snare, HiHat, Clap</div>
+                </div>
+            </div>
+        ` : (channel.instrumentType === 'acidbass' || channel.instrumentType === 'fmsynth') ? `
+            <div class="channel-settings">
+                <div class="setting-item" style="grid-column: 1 / -1;">
+                    <label>${instrumentDisplayName}</label>
+                    <div style="font-size: 0.75em; color: #888;">
+                        ${channel.instrumentType === 'acidbass' ? 'TB-303 style' : 'FM synthesis'}
+                    </div>
+                </div>
+            </div>
+        ` : (channel.instrumentType === 'epiano' || channel.instrumentType === 'vibraphone' || channel.instrumentType === 'uprightbass') ? `
+            <div class="channel-settings">
+                <div class="setting-item" style="grid-column: 1 / -1;">
+                    <label>${instrumentDisplayName}</label>
+                    <div style="font-size: 0.75em; color: #888;">Jazz/Acoustic</div>
                 </div>
             </div>
         ` : `
@@ -759,7 +890,7 @@ function renderChannels() {
         
         div.innerHTML = `
             <div class="channel-header">
-                <div class="channel-name-display">${channel.name} <span style="font-size:0.8em;color:#888;">[${channel.instrumentType}]</span></div>
+                <div class="channel-name-display">${channel.name} <span style="font-size:0.8em;color:#888;">[${instrumentDisplayName}]</span></div>
                 <button class="channel-btn" onclick="event.stopPropagation(); removeChannel(${channel.id})">✕</button>
             </div>
             ${settingsHTML}
@@ -976,6 +1107,15 @@ function setupEventListeners() {
         gridSize = parseInt(e.target.value);
         resizePatterns();
         
+        // Restart sequencer if playing to prevent issues with note timing
+        if (isPlaying) {
+            stopSequencer();
+            Tone.Transport.stop();
+            currentStep = 0;
+            Tone.Transport.start();
+            startSequencer();
+        }
+        
         // Use requestAnimationFrame to prevent lag
         requestAnimationFrame(() => {
             renderSequencerGrid();
@@ -987,6 +1127,15 @@ function setupEventListeners() {
         barCount = parseInt(e.target.value);
         updateLoopEnd();
         resizePatterns();
+        
+        // Restart sequencer if playing to prevent currentStep from being out of bounds
+        if (isPlaying) {
+            stopSequencer();
+            Tone.Transport.stop();
+            currentStep = 0;
+            Tone.Transport.start();
+            startSequencer();
+        }
         
         // Use requestAnimationFrame to prevent lag
         requestAnimationFrame(() => {
