@@ -4,14 +4,9 @@ let channels = [];
 let selectedChannelId = null;
 let currentTempo = 120;
 let isPlaying = false;
-let isRecording = false;
-let recorder = null;
-let recordedChunks = [];
 let mediaStream = null;
 let mediaStreamDestination = null;
 let channelIdCounter = 1;
-let recordingStartTime = 0;
-let recordingTimerInterval = null;
 let undoStack = [];
 let redoStack = [];
 const MAX_UNDO_STACK = 50;
@@ -175,13 +170,6 @@ function setupRecording() {
         const audioContext = toneContext.rawContext || toneContext._context;
         mediaStreamDestination = audioContext.createMediaStreamDestination();
         mediaStream = mediaStreamDestination.stream;
-        
-        // Enable download button once recording is set up
-        const downloadBtn = document.getElementById('downloadBtn');
-        if (downloadBtn) {
-            downloadBtn.disabled = false;
-            downloadBtn.title = 'Record audio first, then export';
-        }
     } catch (error) {
         console.error('Recording setup error:', error);
         alert('Recording feature is not available: ' + error.message);
@@ -1395,114 +1383,6 @@ function clearPattern() {
     }
 }
 
-// Utility function to save project
-function saveProject() {
-    try {
-        const project = {
-            version: '1.0',
-            tempo: currentTempo,
-            gridSize,
-            barCount,
-            channels: channels.map(ch => ({
-                id: ch.id,
-                name: ch.name,
-                instrumentType: ch.instrumentType,
-                waveType: ch.waveType,
-                volume: ch.volume,
-                muted: ch.muted,
-                attack: ch.attack,
-                release: ch.release,
-                pattern: ch.pattern
-            }))
-        };
-        
-        const json = JSON.stringify(project, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `music-project-${Date.now()}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 100);
-        
-        alert('✅ Project saved successfully!');
-    } catch (error) {
-        console.error('Save project error:', error);
-        alert('Failed to save project: ' + error.message);
-    }
-}
-
-function loadProject() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    
-    input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        try {
-            const text = await file.text();
-            const project = JSON.parse(text);
-            
-            // Validate project structure
-            if (!project.channels || !Array.isArray(project.channels)) {
-                throw new Error('Invalid project file');
-            }
-            
-            // Clear existing channels
-            while (channels.length > 0) {
-                const ch = channels[0];
-                if (ch.instrumentType === 'drums') {
-                    ch.synth.kick?.dispose();
-                    ch.synth.snare?.dispose();
-                    ch.synth.hihat?.dispose();
-                    ch.synth.clap?.dispose();
-                } else {
-                    ch.synth?.dispose();
-                }
-                channels.shift();
-            }
-            
-            // Restore settings
-            currentTempo = project.tempo || 120;
-            gridSize = project.gridSize || 16;
-            barCount = project.barCount || 4;
-            Tone.Transport.bpm.value = currentTempo;
-            document.getElementById('tempoInput').value = currentTempo;
-            updateLoopEnd();
-            
-            // Recreate channels
-            await startAudio();
-            project.channels.forEach(chData => {
-                const ch = addChannel(chData.name, chData.instrumentType, chData.waveType);
-                if (ch) {
-                    ch.volume = chData.volume;
-                    ch.muted = chData.muted;
-                    ch.attack = chData.attack;
-                    ch.release = chData.release;
-                    ch.pattern = chData.pattern;
-                    updateChannel(ch.id, 'volume', ch.volume);
-                    updateChannel(ch.id, 'muted', ch.muted);
-                }
-            });
-            
-            renderChannels();
-            renderMixerChannels();
-            renderSequencerGrid();
-            
-            alert('✅ Project loaded successfully!');
-        } catch (error) {
-            console.error('Load project error:', error);
-            alert('Failed to load project: ' + error.message);
-        }
-    };
-    
-    input.click();
-}
-
 // Loading indicator
 function showLoadingIndicator(show, message = 'Loading...') {
     let indicator = document.getElementById('loadingIndicator');
@@ -1546,10 +1426,6 @@ const style = document.createElement('style');
 style.textContent = `
     @keyframes spin {
         to { transform: rotate(360deg); }
-    }
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
     }
 `;
 document.head.appendChild(style);
