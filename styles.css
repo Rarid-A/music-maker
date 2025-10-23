@@ -333,7 +333,7 @@ header h1 {
 .black-key {
     position: absolute;
     top: 0;
-    width: 55%;
+    width: 55px;
     height: 120px;
     background: linear-gradient(to bottom, #1a1a1a 0%, #0a0a0a 100%);
     border: 2px solid #000;
@@ -365,23 +365,23 @@ header h1 {
 
 /* Black key positioning - C#, D#, F#, G#, A# */
 .black-key:nth-of-type(2) {
-    left: calc(100% / 7 * 0.68);
+    left: calc((100% / 7 * 0.68) - 27.5px);
 }
 
 .black-key:nth-of-type(4) {
-    left: calc(100% / 7 * 1.68);
+    left: calc((100% / 7 * 1.68) - 27.5px);
 }
 
 .black-key:nth-of-type(7) {
-    left: calc(100% / 7 * 3.68);
+    left: calc((100% / 7 * 3.68) - 27.5px);
 }
 
 .black-key:nth-of-type(9) {
-    left: calc(100% / 7 * 4.68);
+    left: calc((100% / 7 * 4.68) - 27.5px);
 }
 
 .black-key:nth-of-type(11) {
-    left: calc(100% / 7 * 5.68);
+    left: calc((100% / 7 * 5.68) - 27.5px);
 }
 
 /* Recording Section */
