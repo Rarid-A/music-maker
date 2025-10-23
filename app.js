@@ -219,68 +219,61 @@ async function initializeAudioAndDemo() {
         console.error('Initialization error:', error);
         showLoadingIndicator(false);
         
-        // If auto-start fails (some browsers require user interaction), show a message
+        // If auto-start fails (some browsers require user interaction), show simple message
         showStartPrompt();
     }
 }
 
 function showStartPrompt() {
+    // Create demo setup first so everything is visible
+    createDemoSetup();
+    
     const prompt = document.createElement('div');
     prompt.id = 'startPrompt';
     prompt.style.cssText = `
         position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(0, 0, 0, 0.95);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(45, 45, 58, 0.95);
+        border: 2px solid #667eea;
+        border-radius: 15px;
+        padding: 30px 50px;
+        text-align: center;
         z-index: 2000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        backdrop-filter: blur(5px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(10px);
+        animation: fadeIn 0.5s ease;
     `;
     
     prompt.innerHTML = `
-        <div style="
-            background: linear-gradient(135deg, #2d2d3a, #1f1f2e);
-            border: 2px solid #667eea;
-            border-radius: 20px;
-            padding: 50px;
-            text-align: center;
-            max-width: 500px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        ">
-            <div style="font-size: 4em; margin-bottom: 20px;">🎵</div>
-            <h2 style="color: #667eea; margin-bottom: 20px; font-size: 2em;">Welcome to Music Studio</h2>
-            <p style="color: #ccc; margin-bottom: 30px; font-size: 1.1em; line-height: 1.6;">
-                Click below to start making music!<br>
-                A demo beat is ready to play.
-            </p>
-            <button id="startButton" style="
-                padding: 15px 40px;
-                background: linear-gradient(135deg, #667eea, #764ba2);
-                border: none;
-                border-radius: 10px;
-                color: white;
-                font-size: 1.3em;
-                font-weight: 700;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 8px 30px rgba(102, 126, 234, 0.6)'"
-               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 5px 20px rgba(102, 126, 234, 0.4)'">
-                🎹 Start Making Music
-            </button>
+        <div style="color: #667eea; font-size: 1.5em; font-weight: 600; margin-bottom: 10px;">
+            🎹 Click the piano below to begin
+        </div>
+        <div style="color: #aaa; font-size: 1em;">
+            or press any key (A-K)
         </div>
     `;
     
     document.body.appendChild(prompt);
     
-    document.getElementById('startButton').addEventListener('click', async () => {
+    // Remove prompt on any piano key click or keyboard press
+    const removePrompt = async () => {
         await startAudio();
-        createDemoSetup();
         prompt.remove();
+        document.removeEventListener('keydown', handleKeyPress);
+    };
+    
+    const handleKeyPress = (e) => {
+        if (keyboardMap[e.key.toLowerCase()] || ['z','x','c','v'].includes(e.key.toLowerCase())) {
+            removePrompt();
+        }
+    };
+    
+    document.addEventListener('keydown', handleKeyPress);
+    
+    document.querySelectorAll('.white-key, .black-key').forEach(key => {
+        key.addEventListener('click', removePrompt, { once: true });
     });
 }
 
@@ -480,6 +473,14 @@ function showInstrumentDialog() {
         return;
     }
     
+    // Pause playback to prevent stuck notes
+    const wasPlaying = isPlaying;
+    if (isPlaying) {
+        Tone.Transport.pause();
+        stopSequencer();
+        isPlaying = false;
+    }
+    
     const instrumentType = prompt(
         '🎹 Choose instrument type:\n\n' +
         '1 - Synth (Lead/Melody)\n' +
@@ -491,11 +492,25 @@ function showInstrumentDialog() {
         '1'
     );
     
-    if (!instrumentType) return;
+    if (!instrumentType) {
+        // Resume playback if it was playing
+        if (wasPlaying) {
+            Tone.Transport.start();
+            startSequencer();
+            isPlaying = true;
+        }
+        return;
+    }
     
     // Validate input
     if (!/^[1-5]$/.test(instrumentType.trim())) {
         alert('Invalid choice. Please enter a number between 1 and 5.');
+        // Resume playback if it was playing
+        if (wasPlaying) {
+            Tone.Transport.start();
+            startSequencer();
+            isPlaying = true;
+        }
         return;
     }
     
@@ -510,6 +525,12 @@ function showInstrumentDialog() {
     const selected = types[instrumentType.trim()];
     if (!selected) {
         alert('Invalid choice');
+        // Resume playback if it was playing
+        if (wasPlaying) {
+            Tone.Transport.start();
+            startSequencer();
+            isPlaying = true;
+        }
         return;
     }
     
@@ -525,6 +546,13 @@ function showInstrumentDialog() {
                 renderSequencerGrid();
             });
         }
+    }
+    
+    // Resume playback if it was playing
+    if (wasPlaying) {
+        Tone.Transport.start();
+        startSequencer();
+        isPlaying = true;
     }
 }
 
@@ -591,6 +619,14 @@ function removeChannel(id) {
         return;
     }
     
+    // Pause playback to prevent stuck notes
+    const wasPlaying = isPlaying;
+    if (isPlaying) {
+        Tone.Transport.pause();
+        stopSequencer();
+        isPlaying = false;
+    }
+    
     // Save state for undo
     saveUndoState();
     
@@ -625,6 +661,15 @@ function removeChannel(id) {
         renderMixerChannels();
         renderSequencerGrid();
     });
+    
+    // Resume playback if it was playing
+    if (wasPlaying) {
+        setTimeout(() => {
+            Tone.Transport.start();
+            startSequencer();
+            isPlaying = true;
+        }, 100);
+    }
 }
 
 // Make removeChannel available globally for inline event handlers
@@ -1071,7 +1116,15 @@ async function exportLoop() {
     
     if (!mediaStream) { 
         alert('Audio stream not ready. Please wait for audio to initialize.'); 
-        return; 
+        return;
+    }
+    
+    // Pause playback first to prevent stuck notes
+    const wasPlaying = isPlaying;
+    if (isPlaying) {
+        Tone.Transport.pause();
+        stopSequencer();
+        isPlaying = false;
     }
     
     showLoadingIndicator(true, 'Preparing export...');
@@ -1099,6 +1152,15 @@ async function exportLoop() {
         recorder.onstop = () => {
             const blob = new Blob(recordedChunks, { type: mimeType });
             convertAndDownloadMP3(blob);
+            
+            // Resume playback if it was playing before
+            if (wasPlaying) {
+                setTimeout(() => {
+                    Tone.Transport.start();
+                    startSequencer();
+                    isPlaying = true;
+                }, 100);
+            }
         };
         
         recorder.start();
@@ -1108,34 +1170,37 @@ async function exportLoop() {
         
         showLoadingIndicator(true, `Recording ${barCount} bar loop...`);
         
-        // Start playback if not already playing
-        const wasPlaying = isPlaying;
-        if (!isPlaying) {
-            Tone.Transport.start();
-            startSequencer();
-            isPlaying = true;
-        }
+        // Reset transport position to start of loop
+        Tone.Transport.position = 0;
+        currentStep = 0;
+        
+        // Start fresh playback for recording
+        Tone.Transport.start();
+        startSequencer();
         
         // Record for exactly one loop
         setTimeout(() => {
             recorder.stop();
             
-            // Stop playback if it wasn't playing before
-            if (!wasPlaying) {
-                Tone.Transport.stop();
-                stopSequencer();
-                isPlaying = false;
-            }
+            // Stop playback after recording
+            Tone.Transport.stop();
+            stopSequencer();
+            isPlaying = false;
         }, loopDuration * 1000 + 100); // Add 100ms buffer
         
     } catch (error) {
         console.error('Export error:', error);
         alert('Export error: ' + error.message);
         showLoadingIndicator(false);
+        
+        // Resume playback if it was playing before error
+        if (wasPlaying) {
+            Tone.Transport.start();
+            startSequencer();
+            isPlaying = true;
+        }
     }
-}
-
-async function convertAndDownloadMP3(webmBlob) {
+}async function convertAndDownloadMP3(webmBlob) {
     showLoadingIndicator(true, 'Converting to MP3...');
     
     try {
