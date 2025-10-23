@@ -12,7 +12,7 @@ let redoStack = [];
 const MAX_UNDO_STACK = 50;
 
 const keyboardMap = {'a':'C4','w':'C#4','s':'D4','e':'D#4','d':'E4','f':'F4','t':'F#4','g':'G4','y':'G#4','h':'A4','u':'A#4','j':'B4','k':'C5'};
-const notes = ['C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4', 'C#4', 'C4', 'C3', 'E3', 'G3'];
+const notes = ['D#5', 'C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4', 'C#4', 'C4', 'B3', 'A#3', 'A3', 'G#3', 'G3', 'F#3', 'F3', 'E3', 'D#3', 'D3', 'C#3', 'C3'];
 const drumLabels = ['kick', 'snare', 'hihat', 'clap'];
 let sequencerLoop = null;
 let currentStep = 0;
@@ -435,13 +435,14 @@ function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
         if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
         instrument.volume.value = -15;
     } else if (instrumentType === 'pluck') {
-        instrument = new Tone.PluckSynth({
-            attackNoise: 1,
-            dampening: 4000,
-            resonance: 0.9
+        // MonoSynth configured to sound like a plucked string
+        instrument = new Tone.MonoSynth({
+            oscillator: { type: 'sawtooth' },
+            envelope: { attack: 0.001, decay: 0.1, sustain: 0.0, release: 0.2 },
+            filterEnvelope: { attack: 0.001, decay: 0.2, sustain: 0.0, release: 0.2, baseFrequency: 2000, octaves: 2.5 }
         }).toDestination();
         if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -5; // Increased volume for pluck
+        instrument.volume.value = -10;
     } else {
         // Default synth
         instrument = new Tone.PolySynth(Tone.Synth, {
@@ -569,17 +570,9 @@ function releaseAllNotes() {
                     if (channel.synth.clap && channel.synth.clap.noise) {
                         channel.synth.clap.noise.stop();
                     }
-                } else if (channel.instrumentType === 'pluck' || channel.instrumentType === 'bass' || 
-                           channel.instrumentType === 'acidbass' || channel.instrumentType === 'uprightbass') {
-                    // For monophonic instruments, use triggerRelease
-                    if (channel.synth.triggerRelease) {
-                        channel.synth.triggerRelease();
-                    }
                 } else {
-                    // For polyphonic instruments, release all notes
-                    if (channel.synth.releaseAll) {
-                        channel.synth.releaseAll();
-                    }
+                    // For melodic instruments, release all notes
+                    channel.synth.releaseAll();
                 }
             } catch (error) {
                 console.error('Error releasing notes for channel:', channel.name, error);
@@ -793,14 +786,8 @@ function removeChannel(id) {
             if (channel.synth.clap && channel.synth.clap.noise) {
                 channel.synth.clap.noise.stop();
             }
-        } else if (channel.instrumentType === 'pluck' || channel.instrumentType === 'bass' || 
-                   channel.instrumentType === 'acidbass' || channel.instrumentType === 'uprightbass') {
-            // For monophonic instruments, use triggerRelease
-            if (channel.synth && channel.synth.triggerRelease) {
-                channel.synth.triggerRelease();
-            }
         } else {
-            // For polyphonic instruments, release all notes
+            // For melodic instruments, release all notes
             if (channel.synth && channel.synth.releaseAll) {
                 channel.synth.releaseAll();
             }
