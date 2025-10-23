@@ -24,6 +24,11 @@ let beatInterval = null;
 let currentBeat = 0;
 let currentLoop = 1;
 
+// Loop recording
+let recordedNotes = [];
+let loopPlayback = null;
+let isLooping = false;
+
 // Keyboard mapping
 const keyboardMap = {
     'a': 'C4', 'w': 'C#4',
@@ -238,6 +243,10 @@ function setupEventListeners() {
             if (note && synth) {
                 console.log('Played note:', note);
                 synth.triggerAttackRelease(note, '8n');
+                
+                // Record the note if looping
+                recordNote(note);
+                
                 key.classList.add('active');
                 setTimeout(() => key.classList.remove('active'), 200);
             }
@@ -263,6 +272,9 @@ function setupEventListeners() {
             if (synth) {
                 console.log('Keyboard note:', note);
                 synth.triggerAttackRelease(note, '8n');
+                
+                // Record the note if looping
+                recordNote(note);
                 
                 // Visual feedback
                 const keyElement = document.querySelector(`[data-note="${note}"]`);
@@ -391,6 +403,11 @@ function startBeatIndicator() {
             currentBeat = 1;
             currentLoop++;
             document.getElementById('loopCount').textContent = currentLoop;
+            
+            // Play back recorded notes if looping is active
+            if (isLooping && recordedNotes.length > 0) {
+                playbackRecordedNotes();
+            }
         }
         
         // Highlight current beat
@@ -418,6 +435,54 @@ function stopBeatIndicator() {
 }
 
 // ============================================================
+// LOOP RECORDING & PLAYBACK
+// ============================================================
+
+function recordNote(note) {
+    if (!isLooping) return;
+    
+    const recordTime = {
+        note: note,
+        beat: currentBeat,
+        time: Tone.now()
+    };
+    
+    recordedNotes.push(recordTime);
+    console.log('Recorded note:', note, 'on beat', currentBeat);
+}
+
+function playbackRecordedNotes() {
+    const beatDuration = (60 / currentTempo);
+    
+    recordedNotes.forEach(noteData => {
+        const delay = (noteData.beat - 1) * beatDuration;
+        
+        Tone.Transport.schedule((time) => {
+            if (synth && isLooping) {
+                synth.triggerAttackRelease(noteData.note, '8n', time);
+            }
+        }, `+${delay}`);
+    });
+}
+
+function startLooping() {
+    isLooping = true;
+    recordedNotes = [];
+    console.log('Started loop recording');
+}
+
+function stopLooping() {
+    isLooping = false;
+    console.log('Stopped looping, recorded notes:', recordedNotes.length);
+}
+
+function clearLoop() {
+    recordedNotes = [];
+    isLooping = false;
+    console.log('Loop cleared');
+}
+
+// ============================================================
 // RECORDING FUNCTIONS
 // ============================================================
 
@@ -435,6 +500,9 @@ function startRecording() {
     // Start beat indicator
     startBeatIndicator();
     
+    // Start loop recording
+    startLooping();
+    
     try {
         recorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
         
@@ -451,9 +519,9 @@ function startRecording() {
         document.getElementById('startRecordBtn').disabled = true;
         document.getElementById('stopRecordBtn').disabled = false;
         document.getElementById('downloadBtn').disabled = true;
-        document.getElementById('recordingStatus').textContent = '🔴 Recording... (Press Stop when done)';
+        document.getElementById('recordingStatus').textContent = '🔴 Recording... Play notes, they will loop!';
         
-        console.log('Recording started - will continue until stopped manually');
+        console.log('Recording started - notes will loop automatically');
         
     } catch (error) {
         alert('❌ Recording error: ' + error.message);
@@ -473,6 +541,9 @@ function stopRecording() {
     
     // Stop beat indicator
     stopBeatIndicator();
+    
+    // Stop looping
+    stopLooping();
     
     recorder.onstop = () => {
         recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
@@ -529,6 +600,9 @@ function clearRecording() {
     if (beatIndicator) {
         beatIndicator.classList.add('hidden');
     }
+    
+    // Clear the loop
+    clearLoop();
     
     document.getElementById('startRecordBtn').disabled = false;
     document.getElementById('stopRecordBtn').disabled = true;
