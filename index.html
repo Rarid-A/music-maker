@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="DAW Music Maker - Create music online with virtual instruments">
     <title>DAW Music Maker - Studio</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -11,68 +12,68 @@
     <div class="daw-container">
         
         <!-- Top Bar (Header + Transport) -->
-        <div class="top-bar">
+        <header class="top-bar" role="banner">
             <div class="logo">
                 <h1>🎵 Music Studio</h1>
             </div>
             
             <!-- Transport Controls -->
-            <div class="transport-controls">
-                <button id="playBtn" class="transport-btn" title="Play/Pause">
-                    <span class="icon">▶️</span>
+            <div class="transport-controls" role="toolbar" aria-label="Playback controls">
+                <button id="playBtn" class="transport-btn" title="Play/Pause (Space)" aria-label="Play or Pause">
+                    <span class="icon" aria-hidden="true">▶️</span>
                 </button>
-                <button id="stopBtn" class="transport-btn" title="Stop">
-                    <span class="icon">⏹️</span>
+                <button id="stopBtn" class="transport-btn" title="Stop (Esc)" aria-label="Stop playback">
+                    <span class="icon" aria-hidden="true">⏹️</span>
                 </button>
-                <button id="recordBtn" class="transport-btn record" title="Record">
-                    <span class="icon">⏺️</span>
+                <button id="recordBtn" class="transport-btn record" title="Record" aria-label="Start or stop recording">
+                    <span class="icon" aria-hidden="true">⏺️</span>
                 </button>
                 
                 <div class="tempo-display">
-                    <label>BPM:</label>
-                    <input type="number" id="tempoInput" value="120" min="40" max="200">
+                    <label for="tempoInput">BPM:</label>
+                    <input type="number" id="tempoInput" value="120" min="40" max="200" aria-label="Tempo in beats per minute">
                 </div>
                 
-                <div class="beat-display">
+                <div class="beat-display" role="status" aria-live="polite" aria-label="Current beat position">
                     <span id="beatCounter">1.1.1</span>
                 </div>
             </div>
             
             <!-- Right Controls -->
             <div class="top-right-controls">
-                <button id="downloadBtn" class="btn-download" disabled>💾 Export MP3</button>
-                <button id="guideToggle" class="btn-icon" title="Help">❓</button>
+                <button id="downloadBtn" class="btn-download" disabled aria-label="Export recorded audio as MP3">💾 Export MP3</button>
+                <button id="guideToggle" class="btn-icon" title="Help (F1)" aria-label="Show help guide">❓</button>
             </div>
-        </div>
+        </header>
 
         <!-- Main Layout (3 columns) -->
-        <div class="main-layout">
+        <main class="main-layout" role="main">
             
             <!-- LEFT PANEL: Channel Rack (Instruments) -->
-            <div class="left-panel">
+            <aside class="left-panel" role="complementary" aria-label="Instrument channels">
                 <div class="panel-header">
                     <h2>🎹 Channels</h2>
-                    <button id="addChannelBtn" class="btn-add">+</button>
+                    <button id="addChannelBtn" class="btn-add" aria-label="Add new instrument channel">+</button>
                 </div>
                 
-                <div class="channels-list" id="channelsList">
+                <div class="channels-list" id="channelsList" role="list">
                     <!-- Channels will be added here dynamically -->
                 </div>
-            </div>
+            </aside>
             
             <!-- CENTER PANEL: Piano Roll / Pattern Editor -->
-            <div class="center-panel">
+            <section class="center-panel" aria-label="Pattern sequencer and piano">
                 <div class="panel-header">
                     <h2>🎼 Piano Roll</h2>
                     <div class="piano-roll-controls">
-                        <label>Grid:</label>
-                        <select id="gridSelect">
+                        <label for="gridSelect">Grid:</label>
+                        <select id="gridSelect" aria-label="Note grid resolution">
                             <option value="16">16th</option>
                             <option value="8">8th</option>
                             <option value="4" selected>4th</option>
                         </select>
-                        <label>Bars:</label>
-                        <select id="barsSelect">
+                        <label for="barsSelect">Bars:</label>
+                        <select id="barsSelect" aria-label="Number of bars in pattern">
                             <option value="1">1</option>
                             <option value="2">2</option>
                             <option value="4" selected>4</option>
@@ -88,39 +89,39 @@
                             Click steps to add notes • Selected channel: <span id="selectedChannelName" style="color: #667eea;">None</span>
                         </div>
                     </div>
-                    <div class="sequencer-grid" id="sequencerGrid">
+                    <div class="sequencer-grid" id="sequencerGrid" role="grid" aria-label="Pattern grid">
                         <!-- Pattern grid will be generated here -->
                     </div>
                 </div>
                 
                 <!-- Live Piano Keyboard -->
                 <div class="piano-keyboard">
-                    <div class="keyboard-label">Live Keyboard (A-K keys)</div>
-                    <div class="piano" id="livePiano">
-                        <div class="white-key" data-note="C4" data-key="a">C</div>
-                        <div class="black-key" data-note="C#4" data-key="w"></div>
-                        <div class="white-key" data-note="D4" data-key="s">D</div>
-                        <div class="black-key" data-note="D#4" data-key="e"></div>
-                        <div class="white-key" data-note="E4" data-key="d">E</div>
-                        <div class="white-key" data-note="F4" data-key="f">F</div>
-                        <div class="black-key" data-note="F#4" data-key="t"></div>
-                        <div class="white-key" data-note="G4" data-key="g">G</div>
-                        <div class="black-key" data-note="G#4" data-key="y"></div>
-                        <div class="white-key" data-note="A4" data-key="h">A</div>
-                        <div class="black-key" data-note="A#4" data-key="u"></div>
-                        <div class="white-key" data-note="B4" data-key="j">B</div>
-                        <div class="white-key" data-note="C5" data-key="k">C</div>
+                    <div class="keyboard-label">Live Keyboard (A-K keys, Z-V for drums)</div>
+                    <div class="piano" id="livePiano" role="group" aria-label="Virtual piano keyboard">
+                        <div class="white-key" data-note="C4" data-key="a" role="button" tabindex="0" aria-label="C4 - Press A key">C</div>
+                        <div class="black-key" data-note="C#4" data-key="w" role="button" tabindex="0" aria-label="C sharp 4 - Press W key"></div>
+                        <div class="white-key" data-note="D4" data-key="s" role="button" tabindex="0" aria-label="D4 - Press S key">D</div>
+                        <div class="black-key" data-note="D#4" data-key="e" role="button" tabindex="0" aria-label="D sharp 4 - Press E key"></div>
+                        <div class="white-key" data-note="E4" data-key="d" role="button" tabindex="0" aria-label="E4 - Press D key">E</div>
+                        <div class="white-key" data-note="F4" data-key="f" role="button" tabindex="0" aria-label="F4 - Press F key">F</div>
+                        <div class="black-key" data-note="F#4" data-key="t" role="button" tabindex="0" aria-label="F sharp 4 - Press T key"></div>
+                        <div class="white-key" data-note="G4" data-key="g" role="button" tabindex="0" aria-label="G4 - Press G key">G</div>
+                        <div class="black-key" data-note="G#4" data-key="y" role="button" tabindex="0" aria-label="G sharp 4 - Press Y key"></div>
+                        <div class="white-key" data-note="A4" data-key="h" role="button" tabindex="0" aria-label="A4 - Press H key">A</div>
+                        <div class="black-key" data-note="A#4" data-key="u" role="button" tabindex="0" aria-label="A sharp 4 - Press U key"></div>
+                        <div class="white-key" data-note="B4" data-key="j" role="button" tabindex="0" aria-label="B4 - Press J key">B</div>
+                        <div class="white-key" data-note="C5" data-key="k" role="button" tabindex="0" aria-label="C5 - Press K key">C</div>
                     </div>
                 </div>
-            </div>
+            </section>
             
             <!-- RIGHT PANEL: Mixer -->
-            <div class="right-panel">
+            <aside class="right-panel" role="complementary" aria-label="Audio mixer">
                 <div class="panel-header">
                     <h2>🎚️ Mixer</h2>
                 </div>
                 
-                <div class="mixer-channels" id="mixerChannels">
+                <div class="mixer-channels" id="mixerChannels" role="group" aria-label="Channel faders">
                     <!-- Mixer channels will be added here dynamically -->
                 </div>
                 
@@ -128,18 +129,19 @@
                 <div class="mixer-channel master-channel">
                     <div class="channel-name">Master</div>
                     <input type="range" id="masterVolume" class="volume-slider vertical" 
-                           min="0" max="1" value="0.7" step="0.01" orient="vertical">
-                    <div class="volume-label" id="masterVolumeLabel">70%</div>
+                           min="0" max="1" value="0.7" step="0.01" orient="vertical" 
+                           aria-label="Master volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="70">
+                    <div class="volume-label" id="masterVolumeLabel" aria-hidden="true">70%</div>
                 </div>
-            </div>
+            </aside>
             
-        </div>
+        </main>
 
         <!-- Guide Overlay (hidden by default) -->
-        <div id="guideOverlay" class="guide-overlay hidden">
+        <div id="guideOverlay" class="guide-overlay hidden" role="dialog" aria-labelledby="guideTitle" aria-modal="true">
             <div class="guide-content">
-                <button class="close-guide" id="closeGuide">✕</button>
-                <h2>🎵 How to Use Music Studio</h2>
+                <button class="close-guide" id="closeGuide" aria-label="Close help guide">✕</button>
+                <h2 id="guideTitle">🎵 How to Use Music Studio</h2>
                 
                 <div class="guide-section">
                     <h3>1️⃣ Add Instruments</h3>
@@ -175,8 +177,23 @@
                     <h3>⌨️ Keyboard Shortcuts</h3>
                     <ul>
                         <li><strong>Space</strong> - Play/Pause</li>
+                        <li><strong>Esc</strong> - Stop</li>
+                        <li><strong>Delete</strong> - Clear pattern for selected channel</li>
+                        <li><strong>Ctrl+Z</strong> - Undo</li>
+                        <li><strong>Ctrl+Shift+Z / Ctrl+Y</strong> - Redo</li>
                         <li><strong>A-K</strong> - Play notes (C to C)</li>
                         <li><strong>W, E, T, Y, U</strong> - Black keys (sharps)</li>
+                        <li><strong>Z, X, C, V</strong> - Drum sounds (Kick, Snare, HiHat, Clap)</li>
+                    </ul>
+                </div>
+                
+                <div class="guide-section">
+                    <h3>💡 Tips</h3>
+                    <ul>
+                        <li>Mute channels in the mixer panel to solo others</li>
+                        <li>Adjust grid size for different note lengths</li>
+                        <li>Watch the beat counter to stay in sync</li>
+                        <li>Recording captures all unmuted channels</li>
                     </ul>
                 </div>
             </div>

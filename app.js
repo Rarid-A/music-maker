@@ -10,6 +10,11 @@ let recordedChunks = [];
 let mediaStream = null;
 let mediaStreamDestination = null;
 let channelIdCounter = 1;
+let recordingStartTime = 0;
+let recordingTimerInterval = null;
+let undoStack = [];
+let redoStack = [];
+const MAX_UNDO_STACK = 50;
 
 const keyboardMap = {'a':'C4','w':'C#4','s':'D4','e':'D#4','d':'E4','f':'F4','t':'F#4','g':'G4','y':'G#4','h':'A4','u':'A#4','j':'B4','k':'C5'};
 const notes = ['C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4', 'C#4', 'C4'];
@@ -21,25 +26,51 @@ let barCount = 4;
 
 async function startAudio() {
     if (audioStarted) return;
+    
+    // Show loading indicator
+    showLoadingIndicator(true);
+    
     try {
+        // Check browser compatibility
+        if (!window.AudioContext && !window.webkitAudioContext) {
+            throw new Error('Web Audio API is not supported in your browser');
+        }
+        
         await Tone.start();
         audioStarted = true;
         setupRecording();
-        addChannel('Lead', 'synth', 'sine'); // Fixed: instrumentType='synth', waveType='sine'
-        console.log('Audio started');
+        addChannel('Lead', 'synth', 'sine');
+        console.log('Audio started successfully');
     } catch (error) {
+        console.error('Audio start error:', error);
         alert('Error starting audio: ' + error.message);
+    } finally {
+        showLoadingIndicator(false);
     }
 }
 
 function setupRecording() {
     try {
+        // Check MediaRecorder support
+        if (!window.MediaRecorder) {
+            console.warn('MediaRecorder is not supported in your browser');
+            return;
+        }
+        
         const toneContext = Tone.getContext();
         const audioContext = toneContext.rawContext || toneContext._context;
         mediaStreamDestination = audioContext.createMediaStreamDestination();
         mediaStream = mediaStreamDestination.stream;
+        
+        // Enable download button once recording is set up
+        const downloadBtn = document.getElementById('downloadBtn');
+        if (downloadBtn) {
+            downloadBtn.disabled = false;
+            downloadBtn.title = 'Record audio first, then export';
+        }
     } catch (error) {
         console.error('Recording setup error:', error);
+        alert('Recording feature is not available: ' + error.message);
     }
 }
 
@@ -148,7 +179,6 @@ function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
 }
 
 function selectChannel(id) {
-    selectedChannel = id;
     selectedChannelId = id;
     renderChannels();
     renderSequencerGrid();
@@ -159,33 +189,41 @@ function getSelectedChannel() {
 }
 
 function playNote(channel, note, time = undefined) {
-    if (channel.instrumentType === 'drums') {
-        return; // Drums don't play notes
+    if (!channel || channel.muted || channel.instrumentType === 'drums') {
+        return;
     }
     
-    if (channel.instrumentType === 'bass' || channel.instrumentType === 'pluck') {
-        channel.synth.triggerAttackRelease(note, '8n', time);
-    } else {
-        channel.synth.triggerAttackRelease(note, '8n', time);
+    try {
+        if (channel.instrumentType === 'bass' || channel.instrumentType === 'pluck') {
+            channel.synth.triggerAttackRelease(note, '8n', time);
+        } else {
+            channel.synth.triggerAttackRelease(note, '8n', time);
+        }
+    } catch (error) {
+        console.error('Error playing note:', error);
     }
 }
 
 function playDrum(channel, drumType, time = undefined) {
-    if (channel.instrumentType !== 'drums') return;
+    if (!channel || channel.muted || channel.instrumentType !== 'drums') return;
     
-    switch(drumType) {
-        case 'kick':
-            channel.synth.kick.triggerAttackRelease('C1', '8n', time);
-            break;
-        case 'snare':
-            channel.synth.snare.triggerAttack(time);
-            break;
-        case 'hihat':
-            channel.synth.hihat.triggerAttackRelease('16n', time);
-            break;
-        case 'clap':
-            channel.synth.clap.triggerAttack(time);
-            break;
+    try {
+        switch(drumType) {
+            case 'kick':
+                channel.synth.kick.triggerAttackRelease('C1', '8n', time);
+                break;
+            case 'snare':
+                channel.synth.snare.triggerAttack(time);
+                break;
+            case 'hihat':
+                channel.synth.hihat.triggerAttackRelease('16n', time);
+                break;
+            case 'clap':
+                channel.synth.clap.triggerAttack(time);
+                break;
+        }
+    } catch (error) {
+        console.error('Error playing drum:', error);
     }
 }
 
@@ -203,6 +241,12 @@ function showInstrumentDialog() {
     
     if (!instrumentType) return;
     
+    // Validate input
+    if (!/^[1-5]$/.test(instrumentType.trim())) {
+        alert('Invalid choice. Please enter a number between 1 and 5.');
+        return;
+    }
+    
     const types = {
         '1': { type: 'synth', name: 'Lead' },
         '2': { type: 'bass', name: 'Bass' },
@@ -211,15 +255,15 @@ function showInstrumentDialog() {
         '5': { type: 'drums', name: 'Drums' }
     };
     
-    const selected = types[instrumentType];
+    const selected = types[instrumentType.trim()];
     if (!selected) {
         alert('Invalid choice');
         return;
     }
     
     const name = prompt('Channel name:', `${selected.name} ${channels.length + 1}`);
-    if (name) {
-        addChannel(name, selected.type, 'sine');
+    if (name && name.trim()) {
+        addChannel(name.trim(), selected.type, 'sine');
     }
 }
 
@@ -268,22 +312,34 @@ function removeChannel(id) {
     const index = channels.findIndex(ch => ch.id === id);
     if (index === -1) return;
     
+    // Save state for undo
+    saveUndoState();
+    
     const channel = channels[index];
     
-    // Dispose instruments properly based on type
-    if (channel.instrumentType === 'drums') {
-        // Drums have multiple synths
-        channel.synth.kick.dispose();
-        channel.synth.snare.dispose();
-        channel.synth.hihat.dispose();
-        channel.synth.clap.dispose();
-    } else {
-        // Regular instruments have a single synth
-        channel.synth.dispose();
+    try {
+        // Dispose instruments properly based on type
+        if (channel.instrumentType === 'drums') {
+            // Drums have multiple synths
+            if (channel.synth.kick) channel.synth.kick.dispose();
+            if (channel.synth.snare) channel.synth.snare.dispose();
+            if (channel.synth.hihat) channel.synth.hihat.dispose();
+            if (channel.synth.clap) channel.synth.clap.dispose();
+        } else {
+            // Regular instruments have a single synth
+            if (channel.synth) channel.synth.dispose();
+        }
+    } catch (error) {
+        console.error('Error disposing instrument:', error);
     }
     
     channels.splice(index, 1);
-    if (selectedChannelId === id && channels.length > 0) selectedChannelId = channels[0].id;
+    if (selectedChannelId === id && channels.length > 0) {
+        selectedChannelId = channels[0].id;
+    } else if (channels.length === 0) {
+        selectedChannelId = null;
+    }
+    
     renderChannels();
     renderMixerChannels();
     renderSequencerGrid();
@@ -362,12 +418,16 @@ function renderMixerChannels() {
 
 function renderSequencerGrid() {
     const grid = document.getElementById('sequencerGrid');
-    if (!grid || !selectedChannel) return;
+    if (!grid) return;
+    
+    const channel = channels.find(c => c.id === selectedChannelId);
+    if (!channel) {
+        document.getElementById('selectedChannelName').textContent = 'None';
+        grid.innerHTML = '<div style="color: #888; padding: 20px; text-align: center;">Select a channel to edit patterns</div>';
+        return;
+    }
     
     grid.innerHTML = '';
-    const channel = channels.find(c => c.id === selectedChannel);
-    if (!channel) return;
-    
     document.getElementById('selectedChannelName').textContent = channel.name;
     
     const rowLabels = channel.instrumentType === 'drums' ? drumLabels : notes;
@@ -396,6 +456,9 @@ function renderSequencerGrid() {
             if (isActive) step.classList.add('active');
             
             step.addEventListener('click', () => {
+                // Save state for undo
+                saveUndoState();
+                
                 if (!channel.pattern[stepIndex]) {
                     channel.pattern[stepIndex] = {};
                 }
@@ -419,6 +482,8 @@ function startSequencer() {
     
     sequencerLoop = new Tone.Loop((time) => {
         channels.forEach(channel => {
+            if (channel.muted) return; // Skip muted channels
+            
             const step = channel.pattern[currentStep];
             if (step && channel.instrumentType === 'drums') {
                 drumLabels.forEach(drumType => {
@@ -435,14 +500,31 @@ function startSequencer() {
             }
         });
         
+        // Update beat counter
+        const bar = Math.floor(currentStep / gridSize) + 1;
+        const beat = Math.floor((currentStep % gridSize) / 4) + 1;
+        const tick = (currentStep % 4) + 1;
+        
         // Visual feedback
         Tone.Draw.schedule(() => {
+            // Update beat counter display
+            const beatCounter = document.getElementById('beatCounter');
+            if (beatCounter) {
+                beatCounter.textContent = `${bar}.${beat}.${tick}`;
+            }
+            
+            // Highlight current step
             document.querySelectorAll('.sequencer-step').forEach((el, index) => {
                 const stepPos = index % totalSteps;
                 if (stepPos === currentStep) {
                     el.style.borderColor = '#667eea';
+                    el.style.boxShadow = '0 0 10px rgba(102, 126, 234, 0.5)';
+                } else if (el.classList.contains('beat')) {
+                    el.style.borderColor = '#555';
+                    el.style.boxShadow = 'none';
                 } else {
-                    el.style.borderColor = '#333';
+                    el.style.borderColor = '#3a3a4a';
+                    el.style.boxShadow = 'none';
                 }
             });
         }, time);
@@ -460,8 +542,21 @@ function stopSequencer() {
         sequencerLoop = null;
     }
     currentStep = 0;
+    
+    // Reset beat counter
+    const beatCounter = document.getElementById('beatCounter');
+    if (beatCounter) {
+        beatCounter.textContent = '1.1.1';
+    }
+    
+    // Reset visual feedback
     document.querySelectorAll('.sequencer-step').forEach(el => {
-        el.style.borderColor = '#333';
+        if (el.classList.contains('beat')) {
+            el.style.borderColor = '#555';
+        } else {
+            el.style.borderColor = '#3a3a4a';
+        }
+        el.style.boxShadow = 'none';
     });
 }
 
@@ -471,18 +566,24 @@ function setupEventListeners() {
         showInstrumentDialog();
     });
     
+    // Prevent default behavior to avoid scrolling when focused
     document.getElementById('tempoInput')?.addEventListener('input', (e) => {
-        currentTempo = parseInt(e.target.value);
-        Tone.Transport.bpm.value = currentTempo;
+        const value = parseInt(e.target.value);
+        if (value >= 40 && value <= 200) {
+            currentTempo = value;
+            Tone.Transport.bpm.value = currentTempo;
+        }
     });
     
     document.getElementById('gridSelect')?.addEventListener('change', (e) => {
+        saveUndoState();
         gridSize = parseInt(e.target.value);
         resizePatterns();
         renderSequencerGrid();
     });
     
     document.getElementById('barsSelect')?.addEventListener('change', (e) => {
+        saveUndoState();
         barCount = parseInt(e.target.value);
         updateLoopEnd();
         resizePatterns();
@@ -492,7 +593,13 @@ function setupEventListeners() {
     document.getElementById('playBtn')?.addEventListener('click', togglePlay);
     document.getElementById('stopBtn')?.addEventListener('click', stop);
     document.getElementById('recordBtn')?.addEventListener('click', toggleRecord);
-    document.getElementById('downloadBtn')?.addEventListener('click', () => alert('Recording will auto-download when stopped'));
+    document.getElementById('downloadBtn')?.addEventListener('click', () => {
+        if (!isRecording && recordedChunks.length === 0) {
+            alert('Please record audio first by clicking the Record button ⏺️');
+        } else if (isRecording) {
+            alert('Stop recording first, then the file will auto-download');
+        }
+    });
     
     document.getElementById('guideToggle')?.addEventListener('click', () => {
         document.getElementById('guideOverlay')?.classList.toggle('hidden');
@@ -518,7 +625,46 @@ function setupEventListeners() {
     const drumKeys = { 'z': 'kick', 'x': 'snare', 'c': 'hihat', 'v': 'clap' };
     
     document.addEventListener('keydown', async (e) => {
-        if (e.code === 'Space') { e.preventDefault(); togglePlay(); return; }
+        // Don't trigger shortcuts when typing in inputs
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        // Space bar - Play/Pause
+        if (e.code === 'Space') { 
+            e.preventDefault(); 
+            togglePlay(); 
+            return; 
+        }
+        
+        // Delete key - clear pattern for selected channel
+        if (e.key === 'Delete' && selectedChannelId) {
+            e.preventDefault();
+            clearPattern();
+            return;
+        }
+        
+        // Ctrl+Z - Undo
+        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            undo();
+            return;
+        }
+        
+        // Ctrl+Shift+Z or Ctrl+Y - Redo
+        if ((e.ctrlKey && e.shiftKey && e.key === 'z') || (e.ctrlKey && e.key === 'y')) {
+            e.preventDefault();
+            redo();
+            return;
+        }
+        
+        // Escape - Stop playback
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            stop();
+            return;
+        }
+        
         const key = e.key.toLowerCase();
         if (pressedKeys.has(key)) return;
         pressedKeys.add(key);
@@ -578,48 +724,109 @@ async function toggleRecord() {
 }
 
 function startRecording() {
-    if (!mediaStream) { alert('Audio stream not ready'); return; }
+    if (!mediaStream) { 
+        alert('Audio stream not ready. Please wait for audio to initialize.'); 
+        return; 
+    }
+    
     recordedChunks = [];
+    
     try {
-        recorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
-        recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        // Check supported mime types
+        let mimeType = 'audio/webm';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'audio/webm;codecs=opus';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'audio/ogg;codecs=opus';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    throw new Error('No supported audio format found');
+                }
+            }
+        }
+        
+        recorder = new MediaRecorder(mediaStream, { mimeType });
+        recorder.ondataavailable = (e) => { 
+            if (e.data.size > 0) recordedChunks.push(e.data); 
+        };
         recorder.onstop = () => {
-            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+            stopRecordingTimer();
+            const blob = new Blob(recordedChunks, { type: mimeType });
             convertAndDownloadMP3(blob);
         };
         recorder.start();
         isRecording = true;
-        document.getElementById('recordBtn')?.classList.add('active');
-        if (!isPlaying) { Tone.Transport.start(); isPlaying = true; }
+        recordingStartTime = Date.now();
+        
+        const recordBtn = document.getElementById('recordBtn');
+        if (recordBtn) {
+            recordBtn.classList.add('active');
+            recordBtn.style.animation = 'pulse 1.5s infinite';
+        }
+        
+        startRecordingTimer();
+        
+        if (!isPlaying) { 
+            Tone.Transport.start(); 
+            startSequencer();
+            isPlaying = true; 
+        }
     } catch (error) {
+        console.error('Recording error:', error);
         alert('Recording error: ' + error.message);
     }
 }
 
 function stopRecording() {
     if (!recorder || !isRecording) return;
-    recorder.stop();
-    isRecording = false;
-    document.getElementById('recordBtn')?.classList.remove('active');
+    
+    try {
+        recorder.stop();
+        isRecording = false;
+        
+        const recordBtn = document.getElementById('recordBtn');
+        if (recordBtn) {
+            recordBtn.classList.remove('active');
+            recordBtn.style.animation = '';
+        }
+    } catch (error) {
+        console.error('Error stopping recording:', error);
+    }
 }
 
 async function convertAndDownloadMP3(webmBlob) {
+    showLoadingIndicator(true, 'Converting to MP3...');
+    
     try {
         const mp3Blob = await convertToMp3(webmBlob);
         const url = URL.createObjectURL(mp3Blob);
         const link = document.createElement('a');
         link.href = url;
         link.download = `music-${Date.now()}.mp3`;
+        document.body.appendChild(link);
         link.click();
-        URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+        
+        // Clean up after a delay
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+        
+        alert('✅ Recording downloaded successfully!');
     } catch (error) {
         console.error('MP3 conversion failed:', error);
+        console.log('Downloading as WebM instead...');
+        
         const url = URL.createObjectURL(webmBlob);
         const link = document.createElement('a');
         link.href = url;
         link.download = `music-${Date.now()}.webm`;
+        document.body.appendChild(link);
         link.click();
-        URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+        
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+        
+        alert('⚠️ Downloaded as WebM format (MP3 conversion not available)');
+    } finally {
+        showLoadingIndicator(false);
     }
 }
 
@@ -666,7 +873,198 @@ function floatTo16BitPCM(float32Array) {
     return int16Array;
 }
 
+// Undo/Redo functionality
+function saveUndoState() {
+    const state = {
+        channels: JSON.parse(JSON.stringify(channels.map(ch => ({
+            id: ch.id,
+            name: ch.name,
+            instrumentType: ch.instrumentType,
+            waveType: ch.waveType,
+            volume: ch.volume,
+            muted: ch.muted,
+            attack: ch.attack,
+            release: ch.release,
+            pattern: ch.pattern
+        })))),
+        selectedChannelId,
+        gridSize,
+        barCount
+    };
+    
+    undoStack.push(state);
+    if (undoStack.length > MAX_UNDO_STACK) {
+        undoStack.shift();
+    }
+    redoStack = []; // Clear redo stack on new action
+}
+
+function undo() {
+    if (undoStack.length === 0) {
+        alert('Nothing to undo');
+        return;
+    }
+    
+    // Save current state to redo stack
+    const currentState = {
+        channels: JSON.parse(JSON.stringify(channels.map(ch => ({
+            id: ch.id,
+            name: ch.name,
+            instrumentType: ch.instrumentType,
+            waveType: ch.waveType,
+            volume: ch.volume,
+            muted: ch.muted,
+            attack: ch.attack,
+            release: ch.release,
+            pattern: ch.pattern
+        })))),
+        selectedChannelId,
+        gridSize,
+        barCount
+    };
+    redoStack.push(currentState);
+    
+    // Restore previous state
+    const state = undoStack.pop();
+    restoreState(state);
+}
+
+function redo() {
+    if (redoStack.length === 0) {
+        alert('Nothing to redo');
+        return;
+    }
+    
+    // Save current state to undo stack
+    saveUndoState();
+    
+    // Restore redo state
+    const state = redoStack.pop();
+    restoreState(state);
+}
+
+function restoreState(state) {
+    // This is a simplified restore - in production you'd need to recreate instruments
+    selectedChannelId = state.selectedChannelId;
+    gridSize = state.gridSize;
+    barCount = state.barCount;
+    
+    // Update patterns only (instruments remain)
+    state.channels.forEach(savedChannel => {
+        const channel = channels.find(ch => ch.id === savedChannel.id);
+        if (channel) {
+            channel.pattern = savedChannel.pattern;
+            channel.volume = savedChannel.volume;
+            channel.muted = savedChannel.muted;
+        }
+    });
+    
+    updateLoopEnd();
+    renderChannels();
+    renderMixerChannels();
+    renderSequencerGrid();
+}
+
+function clearPattern() {
+    const channel = channels.find(c => c.id === selectedChannelId);
+    if (!channel) return;
+    
+    if (confirm(`Clear all patterns for "${channel.name}"?`)) {
+        saveUndoState();
+        const totalSteps = getTotalSteps();
+        channel.pattern = Array(totalSteps).fill(null).map(() => ({}));
+        renderSequencerGrid();
+    }
+}
+
+// Recording timer
+function startRecordingTimer() {
+    const beatCounter = document.getElementById('beatCounter');
+    if (!beatCounter) return;
+    
+    recordingTimerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        const originalText = beatCounter.textContent;
+        
+        // Show recording time alternating with beat counter
+        if (Math.floor(elapsed) % 2 === 0) {
+            beatCounter.textContent = `⏺ ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            beatCounter.style.background = '#e53e3e';
+        } else {
+            beatCounter.style.background = '#667eea';
+        }
+    }, 500);
+}
+
+function stopRecordingTimer() {
+    if (recordingTimerInterval) {
+        clearInterval(recordingTimerInterval);
+        recordingTimerInterval = null;
+    }
+    
+    const beatCounter = document.getElementById('beatCounter');
+    if (beatCounter) {
+        beatCounter.style.background = '#667eea';
+    }
+}
+
+// Loading indicator
+function showLoadingIndicator(show, message = 'Loading...') {
+    let indicator = document.getElementById('loadingIndicator');
+    
+    if (show) {
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'loadingIndicator';
+            indicator.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0, 0, 0, 0.9);
+                color: white;
+                padding: 30px 50px;
+                border-radius: 15px;
+                z-index: 2000;
+                font-size: 1.2em;
+                text-align: center;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            `;
+            document.body.appendChild(indicator);
+        }
+        indicator.innerHTML = `
+            <div style="margin-bottom: 15px;">
+                <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #667eea; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            </div>
+            <div>${message}</div>
+        `;
+        indicator.style.display = 'block';
+    } else {
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+    }
+}
+
+// Add CSS animation for loading spinner
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+`;
+document.head.appendChild(style);
+
 document.addEventListener('DOMContentLoaded', () => {
-    if (typeof Tone === 'undefined') { alert('Tone.js not loaded'); return; }
+    if (typeof Tone === 'undefined') { 
+        alert('Tone.js library failed to load. Please check your internet connection.'); 
+        return; 
+    }
     init();
 });
