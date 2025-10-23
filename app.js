@@ -16,6 +16,8 @@ const notes = ['C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', '
 const drumLabels = ['kick', 'snare', 'hihat', 'clap'];
 let sequencerLoop = null;
 let currentStep = 0;
+let gridSize = 16; // 4th notes = 16 steps per bar
+let barCount = 4;
 
 async function startAudio() {
     if (audioStarted) return;
@@ -45,7 +47,32 @@ function init() {
     Tone.Transport.bpm.value = currentTempo;
     Tone.Transport.loop = true;
     Tone.Transport.loopEnd = "4m";
+    updateLoopEnd(); // Set initial loop end based on bar count
     setupEventListeners();
+}
+
+function updateLoopEnd() {
+    Tone.Transport.loopEnd = `${barCount}m`;
+}
+
+function getTotalSteps() {
+    return gridSize * barCount;
+}
+
+function resizePatterns() {
+    const newTotalSteps = getTotalSteps();
+    channels.forEach(channel => {
+        const oldPattern = channel.pattern;
+        const newPattern = Array(newTotalSteps).fill(null).map(() => ({}));
+        
+        // Copy over existing pattern data up to the minimum of old/new length
+        const copyLength = Math.min(oldPattern.length, newPattern.length);
+        for (let i = 0; i < copyLength; i++) {
+            newPattern[i] = { ...oldPattern[i] };
+        }
+        
+        channel.pattern = newPattern;
+    });
 }
 
 function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
@@ -111,7 +138,7 @@ function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
         muted: false, 
         attack: 10, 
         release: 200,
-        pattern: Array(16).fill(null).map(() => ({})) // 16-step pattern
+        pattern: Array(getTotalSteps()).fill(null).map(() => ({})) // Dynamic pattern size
     };
     channels.push(channel);
     renderChannels();
@@ -219,7 +246,10 @@ function updateChannel(id, property, value) {
     } else {
         // Handle regular instrument channels
         if (property === 'waveType') {
-            channel.synth.set({ oscillator: { type: value } });
+            // Update the waveType for synths
+            if (channel.instrumentType === 'synth' || channel.instrumentType === 'pad') {
+                channel.synth.set({ oscillator: { type: value } });
+            }
         } else if (property === 'volume') {
             channel.synth.volume.value = -20 + (value * 20);
         } else if (property === 'muted') {
@@ -231,6 +261,9 @@ function updateChannel(id, property, value) {
     renderMixerChannels();
 }
 
+// Make updateChannel available globally for inline event handlers
+window.updateChannel = updateChannel;
+
 function removeChannel(id) {
     const index = channels.findIndex(ch => ch.id === id);
     if (index === -1) return;
@@ -240,6 +273,9 @@ function removeChannel(id) {
     renderChannels();
     renderMixerChannels();
 }
+
+// Make removeChannel available globally for inline event handlers
+window.removeChannel = removeChannel;
 
 function renderChannels() {
     const channelsList = document.getElementById('channelsList');
@@ -320,10 +356,13 @@ function renderSequencerGrid() {
     document.getElementById('selectedChannelName').textContent = channel.name;
     
     const rowLabels = channel.instrumentType === 'drums' ? drumLabels : notes;
+    const totalSteps = getTotalSteps();
     
     rowLabels.forEach((label, rowIndex) => {
         const row = document.createElement('div');
         row.className = 'sequencer-row';
+        // Set dynamic grid columns
+        row.style.gridTemplateColumns = `80px repeat(${totalSteps}, 35px)`;
         
         const labelDiv = document.createElement('div');
         labelDiv.className = 'sequencer-label';
@@ -333,15 +372,18 @@ function renderSequencerGrid() {
             : label;
         row.appendChild(labelDiv);
         
-        for (let stepIndex = 0; stepIndex < 16; stepIndex++) {
+        for (let stepIndex = 0; stepIndex < totalSteps; stepIndex++) {
             const step = document.createElement('div');
             step.className = 'sequencer-step';
             if (stepIndex % 4 === 0) step.classList.add('beat');
             
-            const isActive = channel.pattern[stepIndex][label];
+            const isActive = channel.pattern[stepIndex] && channel.pattern[stepIndex][label];
             if (isActive) step.classList.add('active');
             
             step.addEventListener('click', () => {
+                if (!channel.pattern[stepIndex]) {
+                    channel.pattern[stepIndex] = {};
+                }
                 channel.pattern[stepIndex][label] = !channel.pattern[stepIndex][label];
                 step.classList.toggle('active');
             });
@@ -357,16 +399,19 @@ function startSequencer() {
     if (sequencerLoop) return;
     
     currentStep = 0;
+    const totalSteps = getTotalSteps();
+    const noteValue = gridSize === 16 ? '16n' : gridSize === 8 ? '8n' : '4n';
+    
     sequencerLoop = new Tone.Loop((time) => {
         channels.forEach(channel => {
             const step = channel.pattern[currentStep];
-            if (channel.instrumentType === 'drums') {
+            if (step && channel.instrumentType === 'drums') {
                 drumLabels.forEach(drumType => {
                     if (step[drumType]) {
                         playDrum(channel, drumType, time);
                     }
                 });
-            } else {
+            } else if (step) {
                 notes.forEach(note => {
                     if (step[note]) {
                         playNote(channel, note, time);
@@ -378,7 +423,7 @@ function startSequencer() {
         // Visual feedback
         Tone.Draw.schedule(() => {
             document.querySelectorAll('.sequencer-step').forEach((el, index) => {
-                const stepPos = index % 16;
+                const stepPos = index % totalSteps;
                 if (stepPos === currentStep) {
                     el.style.borderColor = '#667eea';
                 } else {
@@ -387,8 +432,8 @@ function startSequencer() {
             });
         }, time);
         
-        currentStep = (currentStep + 1) % 16;
-    }, '16n');
+        currentStep = (currentStep + 1) % totalSteps;
+    }, noteValue);
     
     sequencerLoop.start(0);
 }
@@ -414,6 +459,19 @@ function setupEventListeners() {
     document.getElementById('tempoInput')?.addEventListener('input', (e) => {
         currentTempo = parseInt(e.target.value);
         Tone.Transport.bpm.value = currentTempo;
+    });
+    
+    document.getElementById('gridSelect')?.addEventListener('change', (e) => {
+        gridSize = parseInt(e.target.value);
+        resizePatterns();
+        renderSequencerGrid();
+    });
+    
+    document.getElementById('barsSelect')?.addEventListener('change', (e) => {
+        barCount = parseInt(e.target.value);
+        updateLoopEnd();
+        resizePatterns();
+        renderSequencerGrid();
     });
     
     document.getElementById('playBtn')?.addEventListener('click', togglePlay);
