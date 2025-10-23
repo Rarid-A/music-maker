@@ -19,6 +19,11 @@ let mediaStream = null;
 let audioContext = null;
 let mediaStreamDestination = null;
 
+// Beat tracking
+let beatInterval = null;
+let currentBeat = 0;
+let currentLoop = 1;
+
 // Keyboard mapping
 const keyboardMap = {
     'a': 'C4', 'w': 'C#4',
@@ -46,12 +51,6 @@ async function startAudio() {
         await Tone.start();
         console.log('✅ Audio context started');
         audioStarted = true;
-        
-        // Hide the start overlay
-        const overlay = document.getElementById('startOverlay');
-        if (overlay) {
-            overlay.style.display = 'none';
-        }
         
     } catch (error) {
         console.error('❌ Audio start failed:', error);
@@ -143,13 +142,6 @@ function setupRecording() {
 function setupEventListeners() {
     console.log('Setting up event listeners...');
     
-    // START AUDIO BUTTON
-    const startAudioBtn = document.getElementById('startAudioBtn');
-    if (startAudioBtn) {
-        startAudioBtn.addEventListener('click', startAudio);
-        console.log('✅ Start audio button ready');
-    }
-    
     // INSTRUMENT SELECTOR
     const instrumentSelect = document.getElementById('instrumentSelect');
     if (instrumentSelect) {
@@ -201,6 +193,7 @@ function setupEventListeners() {
         loopSelect.addEventListener('change', (e) => {
             loopBeats = parseInt(e.target.value);
             console.log('Loop duration changed to:', loopBeats, 'beats');
+            updateBeatBoxes();
         });
         console.log('✅ Loop selector ready');
     }
@@ -348,6 +341,83 @@ function setupEventListeners() {
 }
 
 // ============================================================
+// BEAT INDICATOR FUNCTIONS
+// ============================================================
+
+function updateBeatBoxes() {
+    const beatBoxesContainer = document.querySelector('.beat-boxes');
+    if (!beatBoxesContainer) return;
+    
+    beatBoxesContainer.innerHTML = '';
+    
+    for (let i = 1; i <= loopBeats; i++) {
+        const box = document.createElement('div');
+        box.className = 'beat-box';
+        box.setAttribute('data-beat', i);
+        box.textContent = i;
+        beatBoxesContainer.appendChild(box);
+    }
+}
+
+function startBeatIndicator() {
+    const beatIndicator = document.getElementById('beatIndicator');
+    if (beatIndicator) {
+        beatIndicator.classList.remove('hidden');
+    }
+    
+    currentBeat = 0;
+    currentLoop = 1;
+    document.getElementById('loopCount').textContent = currentLoop;
+    
+    // Clear any existing interval
+    if (beatInterval) {
+        clearInterval(beatInterval);
+    }
+    
+    // Calculate beat duration in milliseconds
+    const beatDuration = (60000 / currentTempo);
+    
+    beatInterval = setInterval(() => {
+        // Remove active from previous beat
+        document.querySelectorAll('.beat-box').forEach(box => {
+            box.classList.remove('active');
+        });
+        
+        // Increment beat
+        currentBeat++;
+        
+        // Check if we've completed a loop
+        if (currentBeat > loopBeats) {
+            currentBeat = 1;
+            currentLoop++;
+            document.getElementById('loopCount').textContent = currentLoop;
+        }
+        
+        // Highlight current beat
+        const currentBox = document.querySelector(`.beat-box[data-beat="${currentBeat}"]`);
+        if (currentBox) {
+            currentBox.classList.add('active');
+        }
+        
+    }, beatDuration);
+}
+
+function stopBeatIndicator() {
+    if (beatInterval) {
+        clearInterval(beatInterval);
+        beatInterval = null;
+    }
+    
+    // Remove all active states
+    document.querySelectorAll('.beat-box').forEach(box => {
+        box.classList.remove('active');
+    });
+    
+    currentBeat = 0;
+    currentLoop = 1;
+}
+
+// ============================================================
 // RECORDING FUNCTIONS
 // ============================================================
 
@@ -361,6 +431,9 @@ function startRecording() {
 
     recordedChunks = [];
     recordedBlob = null;
+    
+    // Start beat indicator
+    startBeatIndicator();
     
     try {
         recorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
@@ -406,6 +479,9 @@ function stopRecording() {
     
     isRecording = false;
     
+    // Stop beat indicator
+    stopBeatIndicator();
+    
     recorder.onstop = () => {
         recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
         console.log('✅ Recording stopped, size:', recordedBlob.size);
@@ -414,6 +490,14 @@ function stopRecording() {
         document.getElementById('stopRecordBtn').disabled = true;
         document.getElementById('downloadBtn').disabled = false;
         document.getElementById('recordingStatus').textContent = '✅ Ready to download';
+        
+        // Hide beat indicator after a short delay
+        setTimeout(() => {
+            const beatIndicator = document.getElementById('beatIndicator');
+            if (beatIndicator) {
+                beatIndicator.classList.add('hidden');
+            }
+        }, 500);
     };
     
     recorder.stop();
@@ -447,6 +531,13 @@ function clearRecording() {
     recordedBlob = null;
     isRecording = false;
     
+    // Stop and hide beat indicator
+    stopBeatIndicator();
+    const beatIndicator = document.getElementById('beatIndicator');
+    if (beatIndicator) {
+        beatIndicator.classList.add('hidden');
+    }
+    
     document.getElementById('startRecordBtn').disabled = false;
     document.getElementById('stopRecordBtn').disabled = true;
     document.getElementById('downloadBtn').disabled = true;
@@ -469,4 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     console.log('✅ Tone.js loaded, version:', Tone.version);
     init();
+    
+    // Initialize beat boxes with default loop duration
+    updateBeatBoxes();
 });

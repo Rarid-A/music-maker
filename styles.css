@@ -399,6 +399,64 @@ header h1 {
     font-weight: 700;
 }
 
+/* Beat Indicator */
+.beat-indicator {
+    margin-bottom: 30px;
+    padding: 25px;
+    background: linear-gradient(135deg, #f8f9ff 0%, #f5f7ff 100%);
+    border-radius: 12px;
+    border: 2px solid #667eea;
+}
+
+.beat-label {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 15px;
+}
+
+.beat-boxes {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.beat-box {
+    width: 50px;
+    height: 50px;
+    background: white;
+    border: 3px solid #e0e0e0;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1em;
+    color: #999;
+    transition: all 0.15s ease;
+}
+
+.beat-box.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    color: white;
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.loop-counter {
+    font-size: 1em;
+    font-weight: 600;
+    color: #667eea;
+}
+
+.loop-counter span {
+    font-size: 1.2em;
+    font-weight: 700;
+}
+
 .button-group {
     display: flex;
     justify-content: center;
