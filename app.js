@@ -451,17 +451,9 @@ function startRecording() {
         document.getElementById('startRecordBtn').disabled = true;
         document.getElementById('stopRecordBtn').disabled = false;
         document.getElementById('downloadBtn').disabled = true;
-        document.getElementById('recordingStatus').textContent = '🔴 Recording...';
+        document.getElementById('recordingStatus').textContent = '🔴 Recording... (Press Stop when done)';
         
-        // Auto-stop after loop duration
-        const loopDuration = (60000 / currentTempo) * loopBeats;
-        console.log('Recording for', loopDuration, 'ms');
-        
-        setTimeout(() => {
-            if (isRecording) {
-                stopRecording();
-            }
-        }, loopDuration);
+        console.log('Recording started - will continue until stopped manually');
         
     } catch (error) {
         alert('❌ Recording error: ' + error.message);
