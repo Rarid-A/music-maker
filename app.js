@@ -40,9 +40,6 @@ async function startAudio() {
         audioStarted = true;
         setupRecording();
         
-        // Create a user-friendly demo setup
-        createDemoSetup();
-        
         console.log('Audio started successfully');
     } catch (error) {
         console.error('Audio start error:', error);
@@ -101,14 +98,17 @@ function createDemoSetup() {
         selectChannel(lead.id);
     }
     
-    renderChannels();
-    renderMixerChannels();
-    renderSequencerGrid();
+    // Batch render all UI updates at once using requestAnimationFrame
+    requestAnimationFrame(() => {
+        renderChannels();
+        renderMixerChannels();
+        renderSequencerGrid();
+    });
     
     // Show a friendly welcome message
     setTimeout(() => {
         showWelcomeMessage();
-    }, 500);
+    }, 800);
 }
 
 function showWelcomeMessage() {
@@ -188,7 +188,7 @@ function setupRecording() {
     }
 }
 
-function init() {
+async function init() {
     Tone.Transport.bpm.value = currentTempo;
     Tone.Transport.loop = true;
     updateLoopEnd(); // Set initial loop end based on bar count
@@ -199,6 +199,89 @@ function init() {
     if (barsSelect) {
         barsSelect.value = barCount.toString();
     }
+    
+    // Auto-initialize audio and create demo setup on page load
+    await initializeAudioAndDemo();
+}
+
+async function initializeAudioAndDemo() {
+    try {
+        showLoadingIndicator(true, 'Loading Music Studio...');
+        
+        // Start audio context
+        await startAudio();
+        
+        // Create demo setup
+        createDemoSetup();
+        
+        showLoadingIndicator(false);
+    } catch (error) {
+        console.error('Initialization error:', error);
+        showLoadingIndicator(false);
+        
+        // If auto-start fails (some browsers require user interaction), show a message
+        showStartPrompt();
+    }
+}
+
+function showStartPrompt() {
+    const prompt = document.createElement('div');
+    prompt.id = 'startPrompt';
+    prompt.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 2000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(5px);
+    `;
+    
+    prompt.innerHTML = `
+        <div style="
+            background: linear-gradient(135deg, #2d2d3a, #1f1f2e);
+            border: 2px solid #667eea;
+            border-radius: 20px;
+            padding: 50px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        ">
+            <div style="font-size: 4em; margin-bottom: 20px;">🎵</div>
+            <h2 style="color: #667eea; margin-bottom: 20px; font-size: 2em;">Welcome to Music Studio</h2>
+            <p style="color: #ccc; margin-bottom: 30px; font-size: 1.1em; line-height: 1.6;">
+                Click below to start making music!<br>
+                A demo beat is ready to play.
+            </p>
+            <button id="startButton" style="
+                padding: 15px 40px;
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                border: none;
+                border-radius: 10px;
+                color: white;
+                font-size: 1.3em;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 8px 30px rgba(102, 126, 234, 0.6)'"
+               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 5px 20px rgba(102, 126, 234, 0.4)'">
+                🎹 Start Making Music
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(prompt);
+    
+    document.getElementById('startButton').addEventListener('click', async () => {
+        await startAudio();
+        createDemoSetup();
+        prompt.remove();
+    });
 }
 
 function updateLoopEnd() {
@@ -314,8 +397,9 @@ function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
         pattern: Array(getTotalSteps()).fill(null).map(() => ({})) // Dynamic pattern size
     };
     channels.push(channel);
-    renderChannels();
-    renderMixerChannels();
+    
+    // Don't render here - let the caller decide when to render to avoid lag
+    // Rendering is done in showInstrumentDialog or createDemoSetup
     selectChannel(id);
     return channel;
 }
@@ -329,8 +413,12 @@ function selectChannel(id) {
     }
     
     selectedChannelId = id;
-    renderChannels();
-    renderSequencerGrid();
+    
+    // Use requestAnimationFrame to prevent UI lag
+    requestAnimationFrame(() => {
+        renderChannels();
+        renderSequencerGrid();
+    });
 }
 
 function getSelectedChannel() {
@@ -427,7 +515,16 @@ function showInstrumentDialog() {
     
     const name = prompt('Channel name:', `${selected.name} ${channels.length + 1}`);
     if (name && name.trim()) {
-        addChannel(name.trim(), selected.type, 'sine');
+        const newChannel = addChannel(name.trim(), selected.type, 'sine');
+        
+        // Use requestAnimationFrame to prevent lag during UI update
+        if (newChannel) {
+            requestAnimationFrame(() => {
+                renderChannels();
+                renderMixerChannels();
+                renderSequencerGrid();
+            });
+        }
     }
 }
 
@@ -472,7 +569,13 @@ function updateChannel(id, property, value) {
             channel.synth.set({ envelope: { attack: channel.attack / 1000, release: channel.release / 1000 } });
         }
     }
-    renderMixerChannels();
+    
+    // Only re-render mixer if volume or mute changed (avoid unnecessary re-renders)
+    if (property === 'volume' || property === 'muted') {
+        requestAnimationFrame(() => {
+            renderMixerChannels();
+        });
+    }
 }
 
 // Make updateChannel available globally for inline event handlers
@@ -516,9 +619,12 @@ function removeChannel(id) {
         selectedChannelId = null;
     }
     
-    renderChannels();
-    renderMixerChannels();
-    renderSequencerGrid();
+    // Use requestAnimationFrame to prevent lag
+    requestAnimationFrame(() => {
+        renderChannels();
+        renderMixerChannels();
+        renderSequencerGrid();
+    });
 }
 
 // Make removeChannel available globally for inline event handlers
@@ -527,7 +633,10 @@ window.removeChannel = removeChannel;
 function renderChannels() {
     const channelsList = document.getElementById('channelsList');
     if (!channelsList) return;
-    channelsList.innerHTML = '';
+    
+    // Use DocumentFragment for better performance
+    const fragment = document.createDocumentFragment();
+    
     channels.forEach(channel => {
         const div = document.createElement('div');
         div.className = `channel-item ${channel.id === selectedChannelId ? 'selected' : ''}`;
@@ -567,14 +676,21 @@ function renderChannels() {
             </div>
             ${settingsHTML}
         `;
-        channelsList.appendChild(div);
+        fragment.appendChild(div);
     });
+    
+    // Clear and append all at once
+    channelsList.innerHTML = '';
+    channelsList.appendChild(fragment);
 }
 
 function renderMixerChannels() {
     const mixerChannels = document.getElementById('mixerChannels');
     if (!mixerChannels) return;
-    mixerChannels.innerHTML = '';
+    
+    // Use DocumentFragment for better performance
+    const fragment = document.createDocumentFragment();
+    
     channels.forEach(channel => {
         const div = document.createElement('div');
         div.className = 'mixer-channel';
@@ -588,8 +704,12 @@ function renderMixerChannels() {
                         onclick="updateChannel(${channel.id}, 'muted', !${channel.muted})">M</button>
             </div>
         `;
-        mixerChannels.appendChild(div);
+        fragment.appendChild(div);
     });
+    
+    // Clear and append all at once
+    mixerChannels.innerHTML = '';
+    mixerChannels.appendChild(fragment);
 }
 
 function renderSequencerGrid() {
@@ -603,11 +723,13 @@ function renderSequencerGrid() {
         return;
     }
     
-    grid.innerHTML = '';
     document.getElementById('selectedChannelName').textContent = channel.name;
     
     const rowLabels = channel.instrumentType === 'drums' ? drumLabels : notes;
     const totalSteps = getTotalSteps();
+    
+    // Use DocumentFragment for much better performance
+    const fragment = document.createDocumentFragment();
     
     rowLabels.forEach((label, rowIndex) => {
         const row = document.createElement('div');
@@ -631,22 +753,29 @@ function renderSequencerGrid() {
             const isActive = channel.pattern[stepIndex] && channel.pattern[stepIndex][label];
             if (isActive) step.classList.add('active');
             
-            step.addEventListener('click', () => {
-                // Save state for undo
-                saveUndoState();
-                
-                if (!channel.pattern[stepIndex]) {
-                    channel.pattern[stepIndex] = {};
-                }
-                channel.pattern[stepIndex][label] = !channel.pattern[stepIndex][label];
-                step.classList.toggle('active');
-            });
+            // Use closure to capture values correctly
+            step.addEventListener('click', ((currentStep, currentLabel) => {
+                return () => {
+                    // Save state for undo
+                    saveUndoState();
+                    
+                    if (!channel.pattern[currentStep]) {
+                        channel.pattern[currentStep] = {};
+                    }
+                    channel.pattern[currentStep][currentLabel] = !channel.pattern[currentStep][currentLabel];
+                    step.classList.toggle('active');
+                };
+            })(stepIndex, label));
             
             row.appendChild(step);
         }
         
-        grid.appendChild(row);
+        fragment.appendChild(row);
     });
+    
+    // Clear and append all at once for better performance
+    grid.innerHTML = '';
+    grid.appendChild(fragment);
 }
 
 function startSequencer() {
@@ -758,7 +887,11 @@ function setupEventListeners() {
         saveUndoState();
         gridSize = parseInt(e.target.value);
         resizePatterns();
-        renderSequencerGrid();
+        
+        // Use requestAnimationFrame to prevent lag
+        requestAnimationFrame(() => {
+            renderSequencerGrid();
+        });
     });
     
     document.getElementById('barsSelect')?.addEventListener('change', (e) => {
@@ -766,7 +899,11 @@ function setupEventListeners() {
         barCount = parseInt(e.target.value);
         updateLoopEnd();
         resizePatterns();
-        renderSequencerGrid();
+        
+        // Use requestAnimationFrame to prevent lag
+        requestAnimationFrame(() => {
+            renderSequencerGrid();
+        });
     });
     
     document.getElementById('playBtn')?.addEventListener('click', togglePlay);
@@ -1165,9 +1302,13 @@ function restoreState(state) {
     });
     
     updateLoopEnd();
-    renderChannels();
-    renderMixerChannels();
-    renderSequencerGrid();
+    
+    // Batch all UI updates together
+    requestAnimationFrame(() => {
+        renderChannels();
+        renderMixerChannels();
+        renderSequencerGrid();
+    });
 }
 
 function clearPattern() {
@@ -1181,7 +1322,11 @@ function clearPattern() {
         saveUndoState();
         const totalSteps = getTotalSteps();
         channel.pattern = Array(totalSteps).fill(null).map(() => ({}));
-        renderSequencerGrid();
+        
+        // Use requestAnimationFrame to prevent lag
+        requestAnimationFrame(() => {
+            renderSequencerGrid();
+        });
     }
 }
 
