@@ -45,47 +45,71 @@ async function startAudio() {
 }
 
 function createDemoSetup() {
-    // Add demo channels
+    // Add demo channels with cooler instruments
     const drums = addChannel('🥁 Drums', 'drums', 'sine');
-    const bass = addChannel('🎸 Bass', 'bass', 'sine');
-    const lead = addChannel('🎹 Lead', 'synth', 'square');
+    const bass = addChannel('🔊 Bass', 'bass', 'sine');
+    const lead = addChannel('✨ Lead', 'synth', 'sawtooth');
+    const pad = addChannel('🌊 Pad', 'pad', 'sine');
     
-    // Create a simple demo pattern for 1 bar (16 steps)
-    // Drums - basic kick and hihat pattern
+    // Create an energetic demo pattern for 1 bar (16 steps)
+    // Drums - groovy pattern with syncopation
     if (drums) {
-        // Kick on beats 1 and 3 (steps 0, 8)
+        // Kick - four on the floor with variation
         drums.pattern[0] = { kick: true };
+        drums.pattern[4] = { kick: true };
         drums.pattern[8] = { kick: true };
+        drums.pattern[12] = { kick: true };
         
-        // Snare on beats 2 and 4 (steps 4, 12)
-        drums.pattern[4] = { snare: true };
-        drums.pattern[12] = { snare: true };
+        // Snare on 2 and 4 with ghost notes
+        drums.pattern[4] = { ...drums.pattern[4], snare: true };
+        drums.pattern[10] = { snare: true }; // Ghost snare
+        drums.pattern[12] = { ...drums.pattern[12], snare: true };
         
-        // Hihat on every other step (8th notes)
-        for (let i = 0; i < 16; i += 2) {
+        // Hihat - 16th notes with accents
+        for (let i = 0; i < 16; i++) {
             if (!drums.pattern[i]) drums.pattern[i] = {};
             drums.pattern[i].hihat = true;
         }
+        
+        // Claps for extra groove
+        drums.pattern[4] = { ...drums.pattern[4], clap: true };
+        drums.pattern[12] = { ...drums.pattern[12], clap: true };
     }
     
-    // Bass - simple bass line (lower octave)
+    // Bass - funky syncopated bassline
     if (bass) {
         bass.pattern[0] = { C3: true };
-        bass.pattern[4] = { C3: true };
-        bass.pattern[8] = { G3: true };
-        bass.pattern[12] = { E3: true };
+        bass.pattern[2] = { C3: true };
+        bass.pattern[4] = { 'D#3': true };
+        bass.pattern[6] = { 'D#3': true };
+        bass.pattern[8] = { F3: true };
+        bass.pattern[10] = { 'D#3': true };
+        bass.pattern[12] = { C3: true };
+        bass.pattern[14] = { G3: true };
     }
     
-    // Lead - catchy melody
+    // Lead - catchy arpeggiated melody
     if (lead) {
         lead.pattern[0] = { C4: true };
-        lead.pattern[2] = { E4: true };
+        lead.pattern[1] = { 'D#4': true };
+        lead.pattern[2] = { G4: true };
+        lead.pattern[3] = { C5: true };
         lead.pattern[4] = { G4: true };
-        lead.pattern[6] = { E4: true };
-        lead.pattern[8] = { C5: true };
-        lead.pattern[10] = { G4: true };
-        lead.pattern[12] = { E4: true };
-        lead.pattern[14] = { C4: true };
+        lead.pattern[5] = { 'D#4': true };
+        lead.pattern[6] = { C4: true };
+        lead.pattern[8] = { F4: true };
+        lead.pattern[9] = { 'G#4': true };
+        lead.pattern[10] = { C5: true };
+        lead.pattern[11] = { 'D#5': true };
+        lead.pattern[12] = { C5: true };
+        lead.pattern[13] = { 'G#4': true };
+        lead.pattern[14] = { F4: true };
+    }
+    
+    // Pad - atmospheric chords
+    if (pad) {
+        pad.pattern[0] = { C4: true, 'D#4': true, G4: true }; // Cm chord
+        pad.pattern[8] = { F4: true, 'G#4': true, C5: true }; // Fm chord
     }
     
     // Select the lead channel by default so users can immediately see patterns
@@ -707,7 +731,15 @@ function updateChannel(id, property, value) {
         } else if (property === 'muted') {
             channel.synth.volume.value = value ? -Infinity : -20 + (channel.volume * 20);
         } else if (property === 'attack' || property === 'release') {
-            channel.synth.set({ envelope: { attack: channel.attack / 1000, release: channel.release / 1000 } });
+            // Only update envelope for instruments that support it (not FM synths, pluck, or special instruments)
+            const supportsEnvelope = ['synth', 'bass', 'pad', 'pluck', 'acidbass', 'uprightbass'].includes(channel.instrumentType);
+            if (supportsEnvelope && channel.synth.envelope) {
+                try {
+                    channel.synth.set({ envelope: { attack: channel.attack / 1000, release: channel.release / 1000 } });
+                } catch (error) {
+                    console.warn('Could not update envelope for', channel.instrumentType);
+                }
+            }
         }
     }
     
