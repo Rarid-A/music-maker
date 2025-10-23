@@ -3,197 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tone.js Music Maker</title>
+    <title>DAW Music Maker - Studio</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎵 Tone.js Music Maker</h1>
-            <p class="tagline">Create, loop, and download your music</p>
-        </header>
-
-        <nav class="navbar">
-            <button id="guideToggle" class="nav-btn">📖 Guide</button>
-            <button id="settingsToggle" class="nav-btn">⚙️ Settings</button>
-            <a href="https://github.com/Rarid-A/music-maker" target="_blank" class="nav-btn">🔗 GitHub</a>
-        </nav>
-
-        <!-- Guide Section -->
-        <div id="guideSection" class="guide-section hidden">
-            <h2>How to Use the Music Maker</h2>
-            <div class="guide-content">
-                <div class="guide-item">
-                    <h3>1. Select Your Instrument</h3>
-                    <p>Use the "Instrument" dropdown to choose from various synth types (Sine, Square, Triangle, Sawtooth). Each has a different tone quality.</p>
+    <!-- DAW Container -->
+    <div class="daw-container">
+        
+        <!-- Top Bar (Header + Transport) -->
+        <div class="top-bar">
+            <div class="logo">
+                <h1>🎵 Music Studio</h1>
+            </div>
+            
+            <!-- Transport Controls -->
+            <div class="transport-controls">
+                <button id="playBtn" class="transport-btn" title="Play/Pause">
+                    <span class="icon">▶️</span>
+                </button>
+                <button id="stopBtn" class="transport-btn" title="Stop">
+                    <span class="icon">⏹️</span>
+                </button>
+                <button id="recordBtn" class="transport-btn record" title="Record">
+                    <span class="icon">⏺️</span>
+                </button>
+                
+                <div class="tempo-display">
+                    <label>BPM:</label>
+                    <input type="number" id="tempoInput" value="120" min="40" max="200">
                 </div>
-                <div class="guide-item">
-                    <h3>2. Set the Tempo</h3>
-                    <p>Adjust the BPM (Beats Per Minute) using the tempo slider. Default is 120 BPM. Higher BPM = faster music.</p>
+                
+                <div class="beat-display">
+                    <span id="beatCounter">1.1.1</span>
                 </div>
-                <div class="guide-item">
-                    <h3>3. Create Your Melody</h3>
-                    <p>Click on the piano keys or use your keyboard to play notes. The keyboard mapping is shown in the settings.</p>
-                </div>
-                <div class="guide-item">
-                    <h3>4. Set Loop Duration</h3>
-                    <p>Define how many beats your loop should contain (4, 8, 16, 32, or 64 beats). The download will capture exactly one loop.</p>
-                </div>
-                <div class="guide-item">
-                    <h3>5. Adjust Sound Properties</h3>
-                    <p>Use Attack to control how quickly the sound starts, and Release to control how long it sustains after you release a note.</p>
-                </div>
-                <div class="guide-item">
-                    <h3>6. Record and Download</h3>
-                    <p>Press "Start Recording" to begin capturing your performance. The recording will automatically stop after your loop duration. Then "Download Audio" to save your music!</p>
-                </div>
+            </div>
+            
+            <!-- Right Controls -->
+            <div class="top-right-controls">
+                <button id="downloadBtn" class="btn-download" disabled>💾 Export MP3</button>
+                <button id="guideToggle" class="btn-icon" title="Help">❓</button>
             </div>
         </div>
 
-        <!-- Settings Section -->
-        <div id="settingsSection" class="settings-section hidden">
-            <h2>Settings & Help</h2>
-            <div class="settings-content">
-                <div class="setting-group">
-                    <h3>Keyboard Mapping</h3>
-                    <p><strong>White Keys (C-B):</strong> A, S, D, F, G, H, J, K keys</p>
-                    <p><strong>Black Keys (C#-B#):</strong> W, E, T, Y, U keys</p>
-                    <p>Example: Press 'A' for C4, 'W' for C#4, 'S' for D4, etc.</p>
+        <!-- Main Layout (3 columns) -->
+        <div class="main-layout">
+            
+            <!-- LEFT PANEL: Channel Rack (Instruments) -->
+            <div class="left-panel">
+                <div class="panel-header">
+                    <h2>🎹 Channels</h2>
+                    <button id="addChannelBtn" class="btn-add">+</button>
                 </div>
-                <div class="setting-group">
-                    <h3>Tips & Tricks</h3>
+                
+                <div class="channels-list" id="channelsList">
+                    <!-- Channels will be added here dynamically -->
+                </div>
+            </div>
+            
+            <!-- CENTER PANEL: Piano Roll / Pattern Editor -->
+            <div class="center-panel">
+                <div class="panel-header">
+                    <h2>🎼 Piano Roll</h2>
+                    <div class="piano-roll-controls">
+                        <label>Grid:</label>
+                        <select id="gridSelect">
+                            <option value="16">16th</option>
+                            <option value="8">8th</option>
+                            <option value="4" selected>4th</option>
+                        </select>
+                        <label>Bars:</label>
+                        <select id="barsSelect">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="4" selected>4</option>
+                            <option value="8">8</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Piano Roll Grid -->
+                <div class="piano-roll-container" id="pianoRollContainer">
+                    <div class="piano-keys" id="pianoKeys">
+                        <!-- Piano keys will be generated here -->
+                    </div>
+                    <div class="grid-container" id="gridContainer">
+                        <!-- Grid will be generated here -->
+                    </div>
+                </div>
+                
+                <!-- Live Piano Keyboard -->
+                <div class="piano-keyboard">
+                    <div class="keyboard-label">Live Keyboard (A-K keys)</div>
+                    <div class="piano" id="livePiano">
+                        <div class="white-key" data-note="C4" data-key="a">C</div>
+                        <div class="black-key" data-note="C#4" data-key="w"></div>
+                        <div class="white-key" data-note="D4" data-key="s">D</div>
+                        <div class="black-key" data-note="D#4" data-key="e"></div>
+                        <div class="white-key" data-note="E4" data-key="d">E</div>
+                        <div class="white-key" data-note="F4" data-key="f">F</div>
+                        <div class="black-key" data-note="F#4" data-key="t"></div>
+                        <div class="white-key" data-note="G4" data-key="g">G</div>
+                        <div class="black-key" data-note="G#4" data-key="y"></div>
+                        <div class="white-key" data-note="A4" data-key="h">A</div>
+                        <div class="black-key" data-note="A#4" data-key="u"></div>
+                        <div class="white-key" data-note="B4" data-key="j">B</div>
+                        <div class="white-key" data-note="C5" data-key="k">C</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- RIGHT PANEL: Mixer -->
+            <div class="right-panel">
+                <div class="panel-header">
+                    <h2>🎚️ Mixer</h2>
+                </div>
+                
+                <div class="mixer-channels" id="mixerChannels">
+                    <!-- Mixer channels will be added here dynamically -->
+                </div>
+                
+                <!-- Master Channel -->
+                <div class="mixer-channel master-channel">
+                    <div class="channel-name">Master</div>
+                    <input type="range" id="masterVolume" class="volume-slider vertical" 
+                           min="0" max="1" value="0.7" step="0.01" orient="vertical">
+                    <div class="volume-label" id="masterVolumeLabel">70%</div>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Guide Overlay (hidden by default) -->
+        <div id="guideOverlay" class="guide-overlay hidden">
+            <div class="guide-content">
+                <button class="close-guide" id="closeGuide">✕</button>
+                <h2>🎵 How to Use Music Studio</h2>
+                
+                <div class="guide-section">
+                    <h3>1️⃣ Add Instruments</h3>
+                    <p>Click the <strong>+ button</strong> in the Channels panel to add new instruments (Lead, Bass, Pad, Drums, etc.)</p>
+                </div>
+                
+                <div class="guide-section">
+                    <h3>2️⃣ Select & Configure</h3>
+                    <p>Click on a channel to select it. Adjust its wave type, attack, release, and volume in the channel settings.</p>
+                </div>
+                
+                <div class="guide-section">
+                    <h3>3️⃣ Play Notes</h3>
+                    <p>Use the <strong>live keyboard</strong> at the bottom or your computer keyboard (A-K) to play notes with the selected instrument.</p>
+                </div>
+                
+                <div class="guide-section">
+                    <h3>4️⃣ Draw Patterns</h3>
+                    <p>Click on the <strong>piano roll grid</strong> to place notes. They will loop automatically.</p>
+                </div>
+                
+                <div class="guide-section">
+                    <h3>5️⃣ Mix Your Track</h3>
+                    <p>Use the <strong>mixer panel</strong> on the right to adjust volume levels and mute/solo channels.</p>
+                </div>
+                
+                <div class="guide-section">
+                    <h3>6️⃣ Record & Export</h3>
+                    <p>Click the <strong>Record button</strong> ⏺️ to start recording. When done, click <strong>Export MP3</strong> to download your track!</p>
+                </div>
+                
+                <div class="guide-section">
+                    <h3>⌨️ Keyboard Shortcuts</h3>
                     <ul>
-                        <li>🎧 Use headphones for better sound quality</li>
-                        <li>⏱️ Adjust attack for punchy or smooth sounds</li>
-                        <li>🎚️ Use release to create sustain effects</li>
-                        <li>🔊 Lower the volume if the output is too loud</li>
-                        <li>🔄 Set an appropriate loop duration before recording</li>
-                        <li>💾 Downloaded audio will contain exactly one loop</li>
+                        <li><strong>Space</strong> - Play/Pause</li>
+                        <li><strong>A-K</strong> - Play notes (C to C)</li>
+                        <li><strong>W, E, T, Y, U</strong> - Black keys (sharps)</li>
                     </ul>
                 </div>
-                <div class="setting-group">
-                    <h3>About</h3>
-                    <p>This web app is built with <strong>Tone.js</strong>, a JavaScript Web Audio API library.</p>
-                    <p>It records your audio performance and saves it as a WebM audio file for easy playback and sharing.</p>
-                </div>
             </div>
         </div>
 
-        <!-- Main Controls -->
-        <div class="controls-section">
-            <div class="control-group">
-                <label for="instrumentSelect">Instrument:</label>
-                <select id="instrumentSelect">
-                    <option value="sine">Sine Wave</option>
-                    <option value="square">Square Wave</option>
-                    <option value="triangle">Triangle Wave</option>
-                    <option value="sawtooth">Sawtooth Wave</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label for="tempoSlider">Tempo (BPM):</label>
-                <div class="slider-container">
-                    <input type="range" id="tempoSlider" min="40" max="200" value="120" step="1">
-                    <span id="tempoDisplay">120</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label for="volumeSlider">Master Volume:</label>
-                <div class="slider-container">
-                    <input type="range" id="volumeSlider" min="0" max="1" value="0.5" step="0.01">
-                    <span id="volumeDisplay">50%</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label for="loopBeatsSelect">Loop Duration (Beats):</label>
-                <select id="loopBeatsSelect">
-                    <option value="4">4 Beats (1 Bar)</option>
-                    <option value="8">8 Beats (2 Bars)</option>
-                    <option value="16">16 Beats (4 Bars)</option>
-                    <option value="32">32 Beats (8 Bars)</option>
-                    <option value="64">64 Beats (16 Bars)</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label for="attackSlider">Attack (ms):</label>
-                <div class="slider-container">
-                    <input type="range" id="attackSlider" min="0" max="500" value="10" step="10">
-                    <span id="attackDisplay">10</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label for="decaySlider">Release (ms):</label>
-                <div class="slider-container">
-                    <input type="range" id="decaySlider" min="0" max="1000" value="200" step="10">
-                    <span id="decayDisplay">200</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Piano Section -->
-        <div class="piano-section">
-            <h2>Piano Keyboard</h2>
-            <p style="text-align: center; color: #666; margin-bottom: 15px;">Click keys or use your keyboard (A-L for white keys, W,E,T,Y,U for black keys)</p>
-            <div class="piano">
-                <div class="octave">
-                    <div class="white-key" data-note="C4">C</div>
-                    <div class="black-key" data-note="C#4"></div>
-                    <div class="white-key" data-note="D4">D</div>
-                    <div class="black-key" data-note="D#4"></div>
-                    <div class="white-key" data-note="E4">E</div>
-                    <div class="white-key" data-note="F4">F</div>
-                    <div class="black-key" data-note="F#4"></div>
-                    <div class="white-key" data-note="G4">G</div>
-                    <div class="black-key" data-note="G#4"></div>
-                    <div class="white-key" data-note="A4">A</div>
-                    <div class="black-key" data-note="A#4"></div>
-                    <div class="white-key" data-note="B4">B</div>
-                    <div class="white-key" data-note="C5">C</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recording Section -->
-        <div class="recording-section">
-            <h2>Recording & Export</h2>
-            
-            <!-- Beat Indicator -->
-            <div id="beatIndicator" class="beat-indicator hidden">
-                <div class="beat-label">Beat:</div>
-                <div class="beat-boxes">
-                    <div class="beat-box" data-beat="1">1</div>
-                    <div class="beat-box" data-beat="2">2</div>
-                    <div class="beat-box" data-beat="3">3</div>
-                    <div class="beat-box" data-beat="4">4</div>
-                    <div class="beat-box" data-beat="5">5</div>
-                    <div class="beat-box" data-beat="6">6</div>
-                    <div class="beat-box" data-beat="7">7</div>
-                    <div class="beat-box" data-beat="8">8</div>
-                </div>
-                <div class="loop-counter">Loop: <span id="loopCount">1</span></div>
-            </div>
-            
-            <div class="button-group">
-                <button id="startRecordBtn" class="btn btn-primary">▶️ Start Recording</button>
-                <button id="stopRecordBtn" class="btn btn-secondary" disabled>⏹️ Stop Recording</button>
-                <button id="downloadBtn" class="btn btn-success" disabled>💾 Download Audio</button>
-                <button id="clearBtn" class="btn btn-danger">🗑️ Clear</button>
-            </div>
-            <div id="recordingStatus" class="status-message"></div>
-        </div>
-
-        <footer>
-            <p>&copy; 2025 Tone.js Music Maker. Built with ❤️ using <a href="https://tonejs.org" target="_blank">Tone.js</a></p>
-        </footer>
     </div>
 
     <!-- Tone.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    
+    <!-- Lame.js for MP3 encoding -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js"></script>
     
     <!-- Application Script -->
     <script src="app.js"></script>
