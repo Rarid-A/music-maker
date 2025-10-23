@@ -454,6 +454,34 @@ function playDrum(channel, drumType, time = undefined) {
     }
 }
 
+function releaseAllNotes() {
+    // Release all active notes from all instruments to prevent stuck notes
+    channels.forEach(channel => {
+        if (channel && channel.synth) {
+            try {
+                if (channel.instrumentType === 'drums') {
+                    // For drums, just stop the synths
+                    if (channel.synth.kick) channel.synth.kick.triggerRelease();
+                    if (channel.synth.snare && channel.synth.snare.noise) {
+                        channel.synth.snare.noise.stop();
+                    }
+                    if (channel.synth.hihat && channel.synth.hihat.noise) {
+                        channel.synth.hihat.noise.stop();
+                    }
+                    if (channel.synth.clap && channel.synth.clap.noise) {
+                        channel.synth.clap.noise.stop();
+                    }
+                } else {
+                    // For melodic instruments, release all notes
+                    channel.synth.releaseAll();
+                }
+            } catch (error) {
+                console.error('Error releasing notes for channel:', channel.name, error);
+            }
+        }
+    });
+}
+
 function showInstrumentDialog() {
     // Edge case: Check max channels
     if (channels.length >= 16) {
@@ -464,9 +492,11 @@ function showInstrumentDialog() {
     // Pause playback to prevent stuck notes
     const wasPlaying = isPlaying;
     if (isPlaying) {
-        Tone.Transport.pause();
+        Tone.Transport.stop();
         stopSequencer();
         isPlaying = false;
+        // Release all notes from all instruments
+        releaseAllNotes();
     }
     
     const instrumentType = prompt(
@@ -610,9 +640,11 @@ function removeChannel(id) {
     // Pause playback to prevent stuck notes
     const wasPlaying = isPlaying;
     if (isPlaying) {
-        Tone.Transport.pause();
+        Tone.Transport.stop();
         stopSequencer();
         isPlaying = false;
+        // Release all notes from all instruments
+        releaseAllNotes();
     }
     
     // Save state for undo
@@ -621,17 +653,40 @@ function removeChannel(id) {
     const channel = channels[index];
     
     try {
-        // Dispose instruments properly based on type
+        // Release all notes before disposing
         if (channel.instrumentType === 'drums') {
-            // Drums have multiple synths
-            if (channel.synth.kick) channel.synth.kick.dispose();
-            if (channel.synth.snare) channel.synth.snare.dispose();
-            if (channel.synth.hihat) channel.synth.hihat.dispose();
-            if (channel.synth.clap) channel.synth.clap.dispose();
+            // For drums, stop all active sounds
+            if (channel.synth.kick) channel.synth.kick.triggerRelease();
+            if (channel.synth.snare && channel.synth.snare.noise) {
+                channel.synth.snare.noise.stop();
+            }
+            if (channel.synth.hihat && channel.synth.hihat.noise) {
+                channel.synth.hihat.noise.stop();
+            }
+            if (channel.synth.clap && channel.synth.clap.noise) {
+                channel.synth.clap.noise.stop();
+            }
         } else {
-            // Regular instruments have a single synth
-            if (channel.synth) channel.synth.dispose();
+            // For melodic instruments, release all notes
+            if (channel.synth && channel.synth.releaseAll) {
+                channel.synth.releaseAll();
+            }
         }
+        
+        // Small delay to allow notes to release
+        setTimeout(() => {
+            // Dispose instruments properly based on type
+            if (channel.instrumentType === 'drums') {
+                // Drums have multiple synths
+                if (channel.synth.kick) channel.synth.kick.dispose();
+                if (channel.synth.snare) channel.synth.snare.dispose();
+                if (channel.synth.hihat) channel.synth.hihat.dispose();
+                if (channel.synth.clap) channel.synth.clap.dispose();
+            } else {
+                // Regular instruments have a single synth
+                if (channel.synth) channel.synth.dispose();
+            }
+        }, 50);
     } catch (error) {
         console.error('Error disposing instrument:', error);
     }
@@ -1107,13 +1162,18 @@ async function exportLoop() {
         return;
     }
     
-    // Pause playback first to prevent stuck notes
+    // Save playback state
     const wasPlaying = isPlaying;
     if (isPlaying) {
-        Tone.Transport.pause();
+        Tone.Transport.stop();
         stopSequencer();
         isPlaying = false;
+        releaseAllNotes();
     }
+    
+    // Mute the main destination so user doesn't hear the recording
+    const originalVolume = Tone.Destination.volume.value;
+    Tone.Destination.volume.value = -Infinity;
     
     showLoadingIndicator(true, 'Preparing export...');
     
@@ -1139,16 +1199,29 @@ async function exportLoop() {
         
         recorder.onstop = () => {
             const blob = new Blob(recordedChunks, { type: mimeType });
-            convertAndDownloadMP3(blob);
             
-            // Resume playback if it was playing before
-            if (wasPlaying) {
-                setTimeout(() => {
-                    Tone.Transport.start();
-                    startSequencer();
-                    isPlaying = true;
-                }, 100);
-            }
+            // Stop playback and release all notes BEFORE restoring volume
+            Tone.Transport.stop();
+            stopSequencer();
+            releaseAllNotes();
+            
+            // Small delay to ensure all notes are released
+            setTimeout(() => {
+                // Restore original volume
+                Tone.Destination.volume.value = originalVolume;
+                
+                // Convert and download
+                convertAndDownloadMP3(blob);
+                
+                // Resume playback if it was playing before
+                if (wasPlaying) {
+                    setTimeout(() => {
+                        Tone.Transport.start();
+                        startSequencer();
+                        isPlaying = true;
+                    }, 100);
+                }
+            }, 50);
         };
         
         recorder.start();
@@ -1156,13 +1229,13 @@ async function exportLoop() {
         // Calculate loop duration
         const loopDuration = Tone.Time(Tone.Transport.loopEnd).toSeconds();
         
-        showLoadingIndicator(true, `Recording ${barCount} bar loop...`);
+        showLoadingIndicator(true, `Recording ${barCount} bar loop (silent)...`);
         
         // Reset transport position to start of loop
         Tone.Transport.position = 0;
         currentStep = 0;
         
-        // Start fresh playback for recording
+        // Start playback for recording (but muted so user doesn't hear it)
         Tone.Transport.start();
         startSequencer();
         
@@ -1170,16 +1243,17 @@ async function exportLoop() {
         setTimeout(() => {
             recorder.stop();
             
-            // Stop playback after recording
-            Tone.Transport.stop();
-            stopSequencer();
-            isPlaying = false;
+            // Don't restore volume here - let recorder.onstop handle it
+            // This prevents the stuck note from playing loudly
         }, loopDuration * 1000 + 100); // Add 100ms buffer
         
     } catch (error) {
         console.error('Export error:', error);
         alert('Export error: ' + error.message);
         showLoadingIndicator(false);
+        
+        // Restore volume
+        Tone.Destination.volume.value = originalVolume;
         
         // Resume playback if it was playing before error
         if (wasPlaying) {
@@ -1188,7 +1262,9 @@ async function exportLoop() {
             isPlaying = true;
         }
     }
-}async function convertAndDownloadMP3(webmBlob) {
+}
+
+async function convertAndDownloadMP3(webmBlob) {
     showLoadingIndicator(true, 'Converting to MP3...');
     
     try {
