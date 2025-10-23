@@ -17,18 +17,18 @@ let redoStack = [];
 const MAX_UNDO_STACK = 50;
 
 const keyboardMap = {'a':'C4','w':'C#4','s':'D4','e':'D#4','d':'E4','f':'F4','t':'F#4','g':'G4','y':'G#4','h':'A4','u':'A#4','j':'B4','k':'C5'};
-const notes = ['C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4', 'C#4', 'C4'];
+const notes = ['C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4', 'C#4', 'C4', 'C3', 'E3', 'G3'];
 const drumLabels = ['kick', 'snare', 'hihat', 'clap'];
 let sequencerLoop = null;
 let currentStep = 0;
 let gridSize = 16; // 4th notes = 16 steps per bar
-let barCount = 4;
+let barCount = 1; // Start with 1 bar for simplicity
 
 async function startAudio() {
     if (audioStarted) return;
     
     // Show loading indicator
-    showLoadingIndicator(true);
+    showLoadingIndicator(true, 'Initializing Audio...');
     
     try {
         // Check browser compatibility
@@ -39,7 +39,10 @@ async function startAudio() {
         await Tone.start();
         audioStarted = true;
         setupRecording();
-        addChannel('Lead', 'synth', 'sine');
+        
+        // Create a user-friendly demo setup
+        createDemoSetup();
+        
         console.log('Audio started successfully');
     } catch (error) {
         console.error('Audio start error:', error);
@@ -47,6 +50,117 @@ async function startAudio() {
     } finally {
         showLoadingIndicator(false);
     }
+}
+
+function createDemoSetup() {
+    // Add demo channels
+    const drums = addChannel('🥁 Drums', 'drums', 'sine');
+    const bass = addChannel('🎸 Bass', 'bass', 'sine');
+    const lead = addChannel('🎹 Lead', 'synth', 'square');
+    
+    // Create a simple demo pattern for 1 bar (16 steps)
+    // Drums - basic kick and hihat pattern
+    if (drums) {
+        // Kick on beats 1 and 3 (steps 0, 8)
+        drums.pattern[0] = { kick: true };
+        drums.pattern[8] = { kick: true };
+        
+        // Snare on beats 2 and 4 (steps 4, 12)
+        drums.pattern[4] = { snare: true };
+        drums.pattern[12] = { snare: true };
+        
+        // Hihat on every other step (8th notes)
+        for (let i = 0; i < 16; i += 2) {
+            if (!drums.pattern[i]) drums.pattern[i] = {};
+            drums.pattern[i].hihat = true;
+        }
+    }
+    
+    // Bass - simple bass line (lower octave)
+    if (bass) {
+        bass.pattern[0] = { C3: true };
+        bass.pattern[4] = { C3: true };
+        bass.pattern[8] = { G3: true };
+        bass.pattern[12] = { E3: true };
+    }
+    
+    // Lead - catchy melody
+    if (lead) {
+        lead.pattern[0] = { C4: true };
+        lead.pattern[2] = { E4: true };
+        lead.pattern[4] = { G4: true };
+        lead.pattern[6] = { E4: true };
+        lead.pattern[8] = { C5: true };
+        lead.pattern[10] = { G4: true };
+        lead.pattern[12] = { E4: true };
+        lead.pattern[14] = { C4: true };
+    }
+    
+    // Select the lead channel by default so users can immediately see patterns
+    if (lead) {
+        selectChannel(lead.id);
+    }
+    
+    renderChannels();
+    renderMixerChannels();
+    renderSequencerGrid();
+    
+    // Show a friendly welcome message
+    setTimeout(() => {
+        showWelcomeMessage();
+    }, 500);
+}
+
+function showWelcomeMessage() {
+    const message = document.createElement('div');
+    message.style.cssText = `
+        position: fixed;
+        top: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 20px 30px;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        z-index: 1500;
+        text-align: center;
+        font-size: 1.1em;
+        animation: slideDown 0.5s ease;
+        max-width: 90%;
+    `;
+    
+    message.innerHTML = `
+        <div style="font-size: 1.3em; margin-bottom: 10px;">🎵 Welcome to Music Studio!</div>
+        <div style="font-size: 0.9em; line-height: 1.6;">
+            A demo beat is loaded. Press <strong>SPACE</strong> to play!<br>
+            Click the grid to add notes • Try the keyboard A-K to play live
+        </div>
+        <button onclick="this.parentElement.remove()" style="
+            margin-top: 15px;
+            padding: 8px 20px;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid white;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
+           onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+            Got it!
+        </button>
+    `;
+    
+    document.body.appendChild(message);
+    
+    // Auto-dismiss after 8 seconds
+    setTimeout(() => {
+        if (message.parentElement) {
+            message.style.animation = 'slideUp 0.5s ease';
+            setTimeout(() => message.remove(), 500);
+        }
+    }, 8000);
 }
 
 function setupRecording() {
@@ -77,9 +191,14 @@ function setupRecording() {
 function init() {
     Tone.Transport.bpm.value = currentTempo;
     Tone.Transport.loop = true;
-    Tone.Transport.loopEnd = "4m";
     updateLoopEnd(); // Set initial loop end based on bar count
     setupEventListeners();
+    
+    // Update the bars select to show the correct initial value
+    const barsSelect = document.getElementById('barsSelect');
+    if (barsSelect) {
+        barsSelect.value = barCount.toString();
+    }
 }
 
 function updateLoopEnd() {
@@ -92,7 +211,19 @@ function getTotalSteps() {
 
 function resizePatterns() {
     const newTotalSteps = getTotalSteps();
+    
+    // Edge case: Validate new total steps
+    if (newTotalSteps <= 0 || newTotalSteps > 128) {
+        console.error('Invalid total steps:', newTotalSteps);
+        return;
+    }
+    
     channels.forEach(channel => {
+        if (!channel.pattern) {
+            channel.pattern = Array(newTotalSteps).fill(null).map(() => ({}));
+            return;
+        }
+        
         const oldPattern = channel.pattern;
         const newPattern = Array(newTotalSteps).fill(null).map(() => ({}));
         
@@ -107,6 +238,17 @@ function resizePatterns() {
 }
 
 function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
+    // Edge case: Check if too many channels
+    if (channels.length >= 16) {
+        alert('Maximum 16 channels reached. Please remove a channel before adding a new one.');
+        return null;
+    }
+    
+    // Edge case: Validate name
+    if (!name || name.trim().length === 0) {
+        name = `Channel ${channelIdCounter}`;
+    }
+    
     const id = channelIdCounter++;
     let instrument;
     
@@ -145,10 +287,10 @@ function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
         instrument = new Tone.PluckSynth({
             attackNoise: 1,
             dampening: 4000,
-            resonance: 0.7
+            resonance: 0.9
         }).toDestination();
         if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -10;
+        instrument.volume.value = -5; // Increased volume for pluck
     } else {
         // Default synth
         instrument = new Tone.PolySynth(Tone.Synth, {
@@ -179,13 +321,26 @@ function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
 }
 
 function selectChannel(id) {
+    // Edge case: Validate channel exists
+    const channel = channels.find(ch => ch.id === id);
+    if (!channel) {
+        console.warn('Channel not found:', id);
+        return;
+    }
+    
     selectedChannelId = id;
     renderChannels();
     renderSequencerGrid();
 }
 
 function getSelectedChannel() {
-    return channels.find(ch => ch.id === selectedChannelId);
+    const channel = channels.find(ch => ch.id === selectedChannelId);
+    // Edge case: If selected channel doesn't exist, select the first one
+    if (!channel && channels.length > 0) {
+        selectedChannelId = channels[0].id;
+        return channels[0];
+    }
+    return channel;
 }
 
 function playNote(channel, note, time = undefined) {
@@ -194,8 +349,11 @@ function playNote(channel, note, time = undefined) {
     }
     
     try {
-        if (channel.instrumentType === 'bass' || channel.instrumentType === 'pluck') {
+        if (channel.instrumentType === 'bass') {
             channel.synth.triggerAttackRelease(note, '8n', time);
+        } else if (channel.instrumentType === 'pluck') {
+            // Pluck needs a different duration for proper sound
+            channel.synth.triggerAttackRelease(note, '4n', time);
         } else {
             channel.synth.triggerAttackRelease(note, '8n', time);
         }
@@ -228,13 +386,19 @@ function playDrum(channel, drumType, time = undefined) {
 }
 
 function showInstrumentDialog() {
+    // Edge case: Check max channels
+    if (channels.length >= 16) {
+        alert('Maximum 16 channels reached. Please remove a channel before adding a new one.');
+        return;
+    }
+    
     const instrumentType = prompt(
-        'Choose instrument type:\n\n' +
+        '🎹 Choose instrument type:\n\n' +
         '1 - Synth (Lead/Melody)\n' +
-        '2 - Bass\n' +
+        '2 - Bass (Deep sound)\n' +
         '3 - Pad (Ambient)\n' +
         '4 - Pluck (Guitar-like)\n' +
-        '5 - Drums\n\n' +
+        '5 - Drums (Percussion)\n\n' +
         'Enter number (1-5):',
         '1'
     );
@@ -270,6 +434,12 @@ function showInstrumentDialog() {
 function updateChannel(id, property, value) {
     const channel = channels.find(ch => ch.id === id);
     if (!channel) return;
+    
+    // Edge case: Validate volume range
+    if (property === 'volume') {
+        value = Math.max(0, Math.min(1, value));
+    }
+    
     channel[property] = value;
     
     if (channel.instrumentType === 'drums') {
@@ -311,6 +481,12 @@ window.updateChannel = updateChannel;
 function removeChannel(id) {
     const index = channels.findIndex(ch => ch.id === id);
     if (index === -1) return;
+    
+    // Edge case: Don't allow removing the last channel
+    if (channels.length === 1) {
+        alert('Cannot remove the last channel. Keep at least one channel in your project.');
+        return;
+    }
     
     // Save state for undo
     saveUndoState();
@@ -569,9 +745,12 @@ function setupEventListeners() {
     // Prevent default behavior to avoid scrolling when focused
     document.getElementById('tempoInput')?.addEventListener('input', (e) => {
         const value = parseInt(e.target.value);
-        if (value >= 40 && value <= 200) {
-            currentTempo = value;
+        // Edge case: Clamp tempo value
+        const clampedValue = Math.max(40, Math.min(200, value || 120));
+        if (!isNaN(clampedValue)) {
+            currentTempo = clampedValue;
             Tone.Transport.bpm.value = currentTempo;
+            e.target.value = clampedValue;
         }
     });
     
@@ -592,14 +771,7 @@ function setupEventListeners() {
     
     document.getElementById('playBtn')?.addEventListener('click', togglePlay);
     document.getElementById('stopBtn')?.addEventListener('click', stop);
-    document.getElementById('recordBtn')?.addEventListener('click', toggleRecord);
-    document.getElementById('downloadBtn')?.addEventListener('click', () => {
-        if (!isRecording && recordedChunks.length === 0) {
-            alert('Please record audio first by clicking the Record button ⏺️');
-        } else if (isRecording) {
-            alert('Stop recording first, then the file will auto-download');
-        }
-    });
+    document.getElementById('exportBtn')?.addEventListener('click', exportLoop);
     
     document.getElementById('guideToggle')?.addEventListener('click', () => {
         document.getElementById('guideOverlay')?.classList.toggle('hidden');
@@ -609,14 +781,44 @@ function setupEventListeners() {
     });
     
     document.querySelectorAll('.white-key, .black-key').forEach(key => {
-        key.addEventListener('mousedown', async () => {
+        // Mouse events
+        key.addEventListener('mousedown', async (e) => {
+            e.preventDefault();
             await startAudio();
             const note = key.getAttribute('data-note');
             const channel = getSelectedChannel();
             if (note && channel) {
                 playNote(channel, note);
                 key.classList.add('active');
-                setTimeout(() => key.classList.remove('active'), 200);
+                setTimeout(() => key.classList.remove('active'), 300);
+            }
+        });
+        
+        // Touch events for mobile
+        key.addEventListener('touchstart', async (e) => {
+            e.preventDefault();
+            await startAudio();
+            const note = key.getAttribute('data-note');
+            const channel = getSelectedChannel();
+            if (note && channel) {
+                playNote(channel, note);
+                key.classList.add('active');
+                setTimeout(() => key.classList.remove('active'), 300);
+            }
+        });
+        
+        // Keyboard support
+        key.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                await startAudio();
+                const note = key.getAttribute('data-note');
+                const channel = getSelectedChannel();
+                if (note && channel) {
+                    playNote(channel, note);
+                    key.classList.add('active');
+                    setTimeout(() => key.classList.remove('active'), 300);
+                }
             }
         });
     });
@@ -717,19 +919,25 @@ function stop() {
     isPlaying = false;
 }
 
-async function toggleRecord() {
+async function exportLoop() {
     await startAudio();
-    if (isRecording) stopRecording();
-    else startRecording();
-}
-
-function startRecording() {
+    
+    // Edge case: Check if there are any patterns
+    const hasPatterns = channels.some(ch => 
+        ch.pattern.some(step => Object.keys(step).length > 0)
+    );
+    
+    if (!hasPatterns) {
+        alert('No patterns to export! Add some notes to the grid first.');
+        return;
+    }
+    
     if (!mediaStream) { 
         alert('Audio stream not ready. Please wait for audio to initialize.'); 
         return; 
     }
     
-    recordedChunks = [];
+    showLoadingIndicator(true, 'Preparing export...');
     
     try {
         // Check supported mime types
@@ -744,52 +952,49 @@ function startRecording() {
             }
         }
         
+        recordedChunks = [];
         recorder = new MediaRecorder(mediaStream, { mimeType });
+        
         recorder.ondataavailable = (e) => { 
             if (e.data.size > 0) recordedChunks.push(e.data); 
         };
+        
         recorder.onstop = () => {
-            stopRecordingTimer();
             const blob = new Blob(recordedChunks, { type: mimeType });
             convertAndDownloadMP3(blob);
         };
+        
         recorder.start();
-        isRecording = true;
-        recordingStartTime = Date.now();
         
-        const recordBtn = document.getElementById('recordBtn');
-        if (recordBtn) {
-            recordBtn.classList.add('active');
-            recordBtn.style.animation = 'pulse 1.5s infinite';
-        }
+        // Calculate loop duration
+        const loopDuration = Tone.Time(Tone.Transport.loopEnd).toSeconds();
         
-        startRecordingTimer();
+        showLoadingIndicator(true, `Recording ${barCount} bar loop...`);
         
-        if (!isPlaying) { 
-            Tone.Transport.start(); 
+        // Start playback if not already playing
+        const wasPlaying = isPlaying;
+        if (!isPlaying) {
+            Tone.Transport.start();
             startSequencer();
-            isPlaying = true; 
+            isPlaying = true;
         }
-    } catch (error) {
-        console.error('Recording error:', error);
-        alert('Recording error: ' + error.message);
-    }
-}
-
-function stopRecording() {
-    if (!recorder || !isRecording) return;
-    
-    try {
-        recorder.stop();
-        isRecording = false;
         
-        const recordBtn = document.getElementById('recordBtn');
-        if (recordBtn) {
-            recordBtn.classList.remove('active');
-            recordBtn.style.animation = '';
-        }
+        // Record for exactly one loop
+        setTimeout(() => {
+            recorder.stop();
+            
+            // Stop playback if it wasn't playing before
+            if (!wasPlaying) {
+                Tone.Transport.stop();
+                stopSequencer();
+                isPlaying = false;
+            }
+        }, loopDuration * 1000 + 100); // Add 100ms buffer
+        
     } catch (error) {
-        console.error('Error stopping recording:', error);
+        console.error('Export error:', error);
+        alert('Export error: ' + error.message);
+        showLoadingIndicator(false);
     }
 }
 
@@ -901,7 +1106,7 @@ function saveUndoState() {
 
 function undo() {
     if (undoStack.length === 0) {
-        alert('Nothing to undo');
+        // Silent fail for better UX
         return;
     }
     
@@ -931,7 +1136,7 @@ function undo() {
 
 function redo() {
     if (redoStack.length === 0) {
-        alert('Nothing to redo');
+        // Silent fail for better UX
         return;
     }
     
@@ -967,7 +1172,10 @@ function restoreState(state) {
 
 function clearPattern() {
     const channel = channels.find(c => c.id === selectedChannelId);
-    if (!channel) return;
+    if (!channel) {
+        alert('Please select a channel first');
+        return;
+    }
     
     if (confirm(`Clear all patterns for "${channel.name}"?`)) {
         saveUndoState();
@@ -977,37 +1185,112 @@ function clearPattern() {
     }
 }
 
-// Recording timer
-function startRecordingTimer() {
-    const beatCounter = document.getElementById('beatCounter');
-    if (!beatCounter) return;
-    
-    recordingTimerInterval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-        const minutes = Math.floor(elapsed / 60);
-        const seconds = elapsed % 60;
-        const originalText = beatCounter.textContent;
+// Utility function to save project
+function saveProject() {
+    try {
+        const project = {
+            version: '1.0',
+            tempo: currentTempo,
+            gridSize,
+            barCount,
+            channels: channels.map(ch => ({
+                id: ch.id,
+                name: ch.name,
+                instrumentType: ch.instrumentType,
+                waveType: ch.waveType,
+                volume: ch.volume,
+                muted: ch.muted,
+                attack: ch.attack,
+                release: ch.release,
+                pattern: ch.pattern
+            }))
+        };
         
-        // Show recording time alternating with beat counter
-        if (Math.floor(elapsed) % 2 === 0) {
-            beatCounter.textContent = `⏺ ${minutes}:${seconds.toString().padStart(2, '0')}`;
-            beatCounter.style.background = '#e53e3e';
-        } else {
-            beatCounter.style.background = '#667eea';
-        }
-    }, 500);
+        const json = JSON.stringify(project, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `music-project-${Date.now()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+        
+        alert('✅ Project saved successfully!');
+    } catch (error) {
+        console.error('Save project error:', error);
+        alert('Failed to save project: ' + error.message);
+    }
 }
 
-function stopRecordingTimer() {
-    if (recordingTimerInterval) {
-        clearInterval(recordingTimerInterval);
-        recordingTimerInterval = null;
-    }
+function loadProject() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
     
-    const beatCounter = document.getElementById('beatCounter');
-    if (beatCounter) {
-        beatCounter.style.background = '#667eea';
-    }
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        try {
+            const text = await file.text();
+            const project = JSON.parse(text);
+            
+            // Validate project structure
+            if (!project.channels || !Array.isArray(project.channels)) {
+                throw new Error('Invalid project file');
+            }
+            
+            // Clear existing channels
+            while (channels.length > 0) {
+                const ch = channels[0];
+                if (ch.instrumentType === 'drums') {
+                    ch.synth.kick?.dispose();
+                    ch.synth.snare?.dispose();
+                    ch.synth.hihat?.dispose();
+                    ch.synth.clap?.dispose();
+                } else {
+                    ch.synth?.dispose();
+                }
+                channels.shift();
+            }
+            
+            // Restore settings
+            currentTempo = project.tempo || 120;
+            gridSize = project.gridSize || 16;
+            barCount = project.barCount || 4;
+            Tone.Transport.bpm.value = currentTempo;
+            document.getElementById('tempoInput').value = currentTempo;
+            updateLoopEnd();
+            
+            // Recreate channels
+            await startAudio();
+            project.channels.forEach(chData => {
+                const ch = addChannel(chData.name, chData.instrumentType, chData.waveType);
+                if (ch) {
+                    ch.volume = chData.volume;
+                    ch.muted = chData.muted;
+                    ch.attack = chData.attack;
+                    ch.release = chData.release;
+                    ch.pattern = chData.pattern;
+                    updateChannel(ch.id, 'volume', ch.volume);
+                    updateChannel(ch.id, 'muted', ch.muted);
+                }
+            });
+            
+            renderChannels();
+            renderMixerChannels();
+            renderSequencerGrid();
+            
+            alert('✅ Project loaded successfully!');
+        } catch (error) {
+            console.error('Load project error:', error);
+            alert('Failed to load project: ' + error.message);
+        }
+    };
+    
+    input.click();
 }
 
 // Loading indicator

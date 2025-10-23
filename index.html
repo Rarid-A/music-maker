@@ -25,9 +25,6 @@
                 <button id="stopBtn" class="transport-btn" title="Stop (Esc)" aria-label="Stop playback">
                     <span class="icon" aria-hidden="true">⏹️</span>
                 </button>
-                <button id="recordBtn" class="transport-btn record" title="Record" aria-label="Start or stop recording">
-                    <span class="icon" aria-hidden="true">⏺️</span>
-                </button>
                 
                 <div class="tempo-display">
                     <label for="tempoInput">BPM:</label>
@@ -41,8 +38,8 @@
             
             <!-- Right Controls -->
             <div class="top-right-controls">
-                <button id="downloadBtn" class="btn-download" disabled aria-label="Export recorded audio as MP3">💾 Export MP3</button>
-                <button id="guideToggle" class="btn-icon" title="Help (F1)" aria-label="Show help guide">❓</button>
+                <button id="exportBtn" class="btn-export" aria-label="Export loop as MP3">💾 Export Loop</button>
+                <button id="guideToggle" class="btn-icon" title="Help" aria-label="Show help guide">❓</button>
             </div>
         </header>
 
@@ -68,16 +65,16 @@
                     <div class="piano-roll-controls">
                         <label for="gridSelect">Grid:</label>
                         <select id="gridSelect" aria-label="Note grid resolution">
-                            <option value="16">16th</option>
-                            <option value="8">8th</option>
-                            <option value="4" selected>4th</option>
+                            <option value="16">16th notes</option>
+                            <option value="8">8th notes</option>
+                            <option value="4" selected>4th notes (recommended)</option>
                         </select>
                         <label for="barsSelect">Bars:</label>
                         <select id="barsSelect" aria-label="Number of bars in pattern">
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="4" selected>4</option>
-                            <option value="8">8</option>
+                            <option value="1" selected>1 bar (16 steps)</option>
+                            <option value="2">2 bars</option>
+                            <option value="4">4 bars</option>
+                            <option value="8">8 bars</option>
                         </select>
                     </div>
                 </div>
@@ -96,7 +93,12 @@
                 
                 <!-- Live Piano Keyboard -->
                 <div class="piano-keyboard">
-                    <div class="keyboard-label">Live Keyboard (A-K keys, Z-V for drums)</div>
+                    <div class="keyboard-label">
+                        🎹 Live Keyboard - Play notes live with your computer keyboard!
+                        <div style="font-size: 0.85em; color: #888; margin-top: 5px;">
+                            Keys A-K for notes • Z-V for drums • Click or tap piano keys
+                        </div>
+                    </div>
                     <div class="piano" id="livePiano" role="group" aria-label="Virtual piano keyboard">
                         <div class="white-key" data-note="C4" data-key="a" role="button" tabindex="0" aria-label="C4 - Press A key">C</div>
                         <div class="black-key" data-note="C#4" data-key="w" role="button" tabindex="0" aria-label="C sharp 4 - Press W key"></div>
@@ -144,33 +146,48 @@
                 <h2 id="guideTitle">🎵 How to Use Music Studio</h2>
                 
                 <div class="guide-section">
-                    <h3>1️⃣ Add Instruments</h3>
-                    <p>Click the <strong>+ button</strong> in the Channels panel to add new instruments (Lead, Bass, Pad, Drums, etc.)</p>
+                    <h3>🎵 Welcome! Here's a quick tutorial:</h3>
+                    <p>When you first load the app, you'll see a <strong>demo beat</strong> already playing with 3 channels: Drums, Bass, and Lead. Press <strong>Space</strong> to play it!</p>
                 </div>
                 
                 <div class="guide-section">
-                    <h3>2️⃣ Select & Configure</h3>
-                    <p>Click on a channel to select it. Adjust its wave type, attack, release, and volume in the channel settings.</p>
+                    <h3>1️⃣ Understanding the Interface</h3>
+                    <ul>
+                        <li><strong>Left Panel</strong> - Your instrument channels (click to select)</li>
+                        <li><strong>Center Panel</strong> - Piano roll grid for drawing patterns</li>
+                        <li><strong>Right Panel</strong> - Mixer for volume control</li>
+                        <li><strong>Bottom</strong> - Live keyboard for playing notes</li>
+                    </ul>
                 </div>
                 
                 <div class="guide-section">
-                    <h3>3️⃣ Play Notes</h3>
-                    <p>Use the <strong>live keyboard</strong> at the bottom or your computer keyboard (A-K) to play notes with the selected instrument.</p>
+                    <h3>2️⃣ Draw Patterns</h3>
+                    <p>Click any channel on the left to select it, then <strong>click squares in the grid</strong> to add notes. Each row is a different note. Click again to remove.</p>
                 </div>
                 
                 <div class="guide-section">
-                    <h3>4️⃣ Draw Patterns</h3>
-                    <p>Click on the <strong>piano roll grid</strong> to place notes. They will loop automatically.</p>
+                    <h3>3️⃣ Play Live</h3>
+                    <p>Use the <strong>keyboard or piano</strong> at the bottom to play notes live with the selected instrument:</p>
+                    <ul>
+                        <li><strong>A-K</strong> = White keys (C to C)</li>
+                        <li><strong>W, E, T, Y, U</strong> = Black keys (sharps)</li>
+                        <li><strong>Z, X, C, V</strong> = Drums (Kick, Snare, HiHat, Clap)</li>
+                    </ul>
+                </div>
+                
+                <div class="guide-section">
+                    <h3>4️⃣ Add More Instruments</h3>
+                    <p>Click the <strong>+ button</strong> in Channels panel. Choose from Synth, Bass, Pad, Pluck, or Drums.</p>
                 </div>
                 
                 <div class="guide-section">
                     <h3>5️⃣ Mix Your Track</h3>
-                    <p>Use the <strong>mixer panel</strong> on the right to adjust volume levels and mute/solo channels.</p>
+                    <p>Use the <strong>mixer panel</strong> on the right to adjust volume and mute channels. The "M" button mutes a channel.</p>
                 </div>
                 
                 <div class="guide-section">
-                    <h3>6️⃣ Record & Export</h3>
-                    <p>Click the <strong>Record button</strong> ⏺️ to start recording. When done, click <strong>Export MP3</strong> to download your track!</p>
+                    <h3>6️⃣ Export Your Music</h3>
+                    <p>Click <strong>💾 Export Loop</strong> to download your pattern as an MP3 file. It will record exactly one loop.</p>
                 </div>
                 
                 <div class="guide-section">

@@ -117,7 +117,7 @@ body {
     align-items: center;
 }
 
-.btn-download { 
+.btn-export { 
     padding: 10px 25px; 
     background: linear-gradient(135deg, #48bb78, #38a169); 
     border: none; 
@@ -126,17 +126,17 @@ body {
     font-weight: 600; 
     cursor: pointer; 
     transition: all 0.2s ease;
+    font-size: 1em;
 }
 
-.btn-download:hover:not(:disabled) {
+.btn-export:hover {
     background: linear-gradient(135deg, #5cd68d, #48bb78);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+    box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
 }
 
-.btn-download:disabled { 
-    opacity: 0.4; 
-    cursor: not-allowed;
+.btn-export:active {
+    transform: translateY(0);
 }
 
 .btn-icon { 
@@ -386,7 +386,11 @@ body {
 }
 
 .sequencer-info { 
-    margin-bottom: 10px; 
+    margin-bottom: 15px;
+    padding: 10px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 8px;
+    border-left: 3px solid #667eea;
 }
 
 .sequencer-grid { 
@@ -435,16 +439,19 @@ body {
 }
 
 .piano-keyboard { 
-    background: #2d2d3a; 
-    padding: 15px; 
-    border-top: 2px solid #333; 
+    background: linear-gradient(135deg, #2d2d3a, #252530);
+    padding: 20px 15px; 
+    border-top: 2px solid #667eea;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .keyboard-label {
     text-align: center;
-    margin-bottom: 10px;
-    color: #888;
-    font-size: 0.9em;
+    margin-bottom: 15px;
+    color: #ccc;
+    font-size: 1em;
+    font-weight: 600;
+    line-height: 1.6;
 }
 
 .piano { 
@@ -460,8 +467,8 @@ body {
     flex: 1; 
     min-width: 45px; 
     height: 140px; 
-    background: linear-gradient(to bottom, #fff, #e8e8e8); 
-    border: 2px solid #222; 
+    background: linear-gradient(to bottom, #ffffff, #e8e8e8); 
+    border: 2px solid #333; 
     border-radius: 0 0 8px 8px; 
     cursor: pointer; 
     display: flex; 
@@ -469,13 +476,16 @@ body {
     justify-content: center; 
     padding-bottom: 8px; 
     color: #333; 
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 1.1em;
     transition: all 0.1s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .white-key:hover {
-    background: linear-gradient(to bottom, #f0f0f0, #d8d8d8);
+    background: linear-gradient(to bottom, #f8f8f8, #d8d8d8);
     transform: translateY(2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .white-key:focus {
@@ -491,19 +501,21 @@ body {
 
 .black-key { 
     position: absolute; 
-    width: 30px; 
+    width: 32px; 
     height: 90px; 
-    background: linear-gradient(to bottom, #1a1a1a, #0a0a0a); 
+    background: linear-gradient(to bottom, #222, #000); 
     border: 2px solid #000; 
     border-radius: 0 0 6px 6px; 
     cursor: pointer; 
     z-index: 10; 
     transition: all 0.1s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
 }
 
 .black-key:hover {
-    background: linear-gradient(to bottom, #2a2a2a, #1a1a1a);
+    background: linear-gradient(to bottom, #333, #111);
     transform: translateY(2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .black-key:focus {
@@ -697,6 +709,28 @@ body {
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
 }
 
 /* Focus visible for better accessibility */
