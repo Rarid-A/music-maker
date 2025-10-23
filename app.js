@@ -28,7 +28,7 @@ async function startAudio() {
     if (audioStarted) return;
     
     // Show loading indicator
-    showLoadingIndicator(true, 'Initializing Audio...');
+    showLoadingIndicator(true, 'press a key to start...');
     
     try {
         // Check browser compatibility
