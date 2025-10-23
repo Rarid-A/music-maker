@@ -1,1683 +1,398 @@
-﻿// DAW MUSIC MAKER - Multi-Instrument Support
-let audioStarted = false;
-let channels = [];
-let selectedChannelId = null;
-let currentTempo = 120;
-let isPlaying = false;
-let mediaStream = null;
-let mediaStreamDestination = null;
-let channelIdCounter = 1;
-let undoStack = [];
-let redoStack = [];
-const MAX_UNDO_STACK = 50;
+﻿// MAIN APP - Coordination and initialization
+class MusicStudioApp {
+    constructor() {
+        this.audioManager = new AudioManager();
+        this.channelManager = new ChannelManager(this.audioManager);
+        this.sequencer = new Sequencer(this.channelManager);
+        this.uiManager = new UIManager(this.channelManager, this.sequencer);
+        this.exportManager = new ExportManager(this.audioManager, this.channelManager, this.sequencer);
+        
+        // Undo/Redo functionality
+        this.undoStack = [];
+        this.redoStack = [];
+        this.MAX_UNDO_STACK = 50;
+        
+        // Make sequencer available globally for channel manager
+        window.sequencer = this.sequencer;
+    }
 
-const keyboardMap = {'a':'C4','w':'C#4','s':'D4','e':'D#4','d':'E4','f':'F4','t':'F#4','g':'G4','y':'G#4','h':'A4','u':'A#4','j':'B4','k':'C5'};
-const notes = ['D#5', 'C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4', 'C#4', 'C4', 'B3', 'A#3', 'A3', 'G#3', 'G3', 'F#3', 'F3', 'E3', 'D#3', 'D3', 'C#3', 'C3'];
-const drumLabels = ['kick', 'snare', 'hihat', 'clap'];
-let sequencerLoop = null;
-let currentStep = 0;
-let gridSize = 16; // 4th notes = 16 steps per bar
-let barCount = 1; // Start with 1 bar for simplicity
-
-async function startAudio() {
-    if (audioStarted) return;
-    
-    // Show loading indicator
-    showLoadingIndicator(true, 'press a key to start...');
-    
-    try {
-        // Check browser compatibility
-        if (!window.AudioContext && !window.webkitAudioContext) {
-            throw new Error('Web Audio API is not supported in your browser');
+    async init() {
+        this.sequencer.init();
+        this.setupEventListeners();
+        
+        // Update the bars select to show the correct initial value
+        const barsSelect = document.getElementById('barsSelect');
+        if (barsSelect) {
+            barsSelect.value = this.sequencer.getBarCount().toString();
         }
         
-        await Tone.start();
-        audioStarted = true;
-        setupRecording();
-        
-        console.log('Audio started successfully');
-    } catch (error) {
-        console.error('Audio start error:', error);
-        alert('Error starting audio: ' + error.message);
-    } finally {
-        showLoadingIndicator(false);
+        // Auto-initialize audio and create demo setup on page load
+        await this.initializeAudioAndDemo();
     }
-}
 
-function createDemoSetup() {
-    // Add demo channels with cooler instruments
-    const drums = addChannel('🥁 Drums', 'drums', 'sine');
-    const bass = addChannel('🔊 Bass', 'bass', 'sine');
-    const lead = addChannel('✨ Lead', 'synth', 'sawtooth');
-    const pad = addChannel('🌊 Pad', 'pad', 'sine');
-    
-    // Create an energetic demo pattern for 1 bar (16 steps)
-    // Drums - groovy pattern with syncopation
-    if (drums) {
-        // Kick - four on the floor with variation
-        drums.pattern[0] = { kick: true };
-        drums.pattern[4] = { kick: true };
-        drums.pattern[8] = { kick: true };
-        drums.pattern[12] = { kick: true };
-        
-        // Snare on 2 and 4 with ghost notes
-        drums.pattern[4] = { ...drums.pattern[4], snare: true };
-        drums.pattern[10] = { snare: true }; // Ghost snare
-        drums.pattern[12] = { ...drums.pattern[12], snare: true };
-        
-        // Hihat - 16th notes with accents
-        for (let i = 0; i < 16; i++) {
-            if (!drums.pattern[i]) drums.pattern[i] = {};
-            drums.pattern[i].hihat = true;
+    async initializeAudioAndDemo() {
+        try {
+            this.audioManager.showLoadingIndicator(true, 'Loading Music Studio...');
+            
+            // Start audio context
+            await this.audioManager.startAudio();
+            
+            // Create demo setup
+            this.uiManager.createDemoSetup();
+            
+            this.audioManager.showLoadingIndicator(false);
+        } catch (error) {
+            console.error('Initialization error:', error);
+            this.audioManager.showLoadingIndicator(false);
+            
+            // If auto-start fails (some browsers require user interaction), show simple message
+            this.uiManager.showStartPrompt();
         }
-        
-        // Claps for extra groove
-        drums.pattern[4] = { ...drums.pattern[4], clap: true };
-        drums.pattern[12] = { ...drums.pattern[12], clap: true };
     }
-    
-    // Bass - funky syncopated bassline
-    if (bass) {
-        bass.pattern[0] = { C3: true };
-        bass.pattern[2] = { C3: true };
-        bass.pattern[4] = { 'D#3': true };
-        bass.pattern[6] = { 'D#3': true };
-        bass.pattern[8] = { F3: true };
-        bass.pattern[10] = { 'D#3': true };
-        bass.pattern[12] = { C3: true };
-        bass.pattern[14] = { G3: true };
-    }
-    
-    // Lead - catchy arpeggiated melody
-    if (lead) {
-        lead.pattern[0] = { C4: true };
-        lead.pattern[1] = { 'D#4': true };
-        lead.pattern[2] = { G4: true };
-        lead.pattern[3] = { C5: true };
-        lead.pattern[4] = { G4: true };
-        lead.pattern[5] = { 'D#4': true };
-        lead.pattern[6] = { C4: true };
-        lead.pattern[8] = { F4: true };
-        lead.pattern[9] = { 'G#4': true };
-        lead.pattern[10] = { C5: true };
-        lead.pattern[11] = { 'D#5': true };
-        lead.pattern[12] = { C5: true };
-        lead.pattern[13] = { 'G#4': true };
-        lead.pattern[14] = { F4: true };
-    }
-    
-    // Pad - atmospheric chords
-    if (pad) {
-        pad.pattern[0] = { C4: true, 'D#4': true, G4: true }; // Cm chord
-        pad.pattern[8] = { F4: true, 'G#4': true, C5: true }; // Fm chord
-    }
-    
-    // Select the lead channel by default so users can immediately see patterns
-    if (lead) {
-        selectChannel(lead.id);
-    }
-    
-    // Batch render all UI updates at once using requestAnimationFrame
-    requestAnimationFrame(() => {
-        renderChannels();
-        renderMixerChannels();
-        renderSequencerGrid();
-    });
-    
-    // Show a friendly welcome message
-    setTimeout(() => {
-        showWelcomeMessage();
-    }, 800);
-}
 
-function showWelcomeMessage() {
-    const message = document.createElement('div');
-    message.style.cssText = `
-        position: fixed;
-        top: 80px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white;
-        padding: 20px 30px;
-        border-radius: 12px;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        z-index: 1500;
-        text-align: center;
-        font-size: 1.1em;
-        animation: slideDown 0.5s ease;
-        max-width: 90%;
-    `;
-    
-    message.innerHTML = `
-        <div style="font-size: 1.3em; margin-bottom: 10px;">🎵 Welcome to Music Studio!</div>
-        <div style="font-size: 0.9em; line-height: 1.6;">
-            A demo beat is loaded. Press <strong>SPACE</strong> to play!<br>
-            Click the grid to add notes • Try the keyboard A-K to play live
-        </div>
-        <button onclick="this.parentElement.remove()" style="
-            margin-top: 15px;
-            padding: 8px 20px;
-            background: rgba(255,255,255,0.2);
-            border: 2px solid white;
-            border-radius: 6px;
-            color: white;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s;
-        " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
-           onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-            Got it!
-        </button>
-    `;
-    
-    document.body.appendChild(message);
-    
-    // Auto-dismiss after 8 seconds
-    setTimeout(() => {
-        if (message.parentElement) {
-            message.style.animation = 'slideUp 0.5s ease';
-            setTimeout(() => message.remove(), 500);
-        }
-    }, 8000);
-}
-
-function setupRecording() {
-    try {
-        // Check MediaRecorder support
-        if (!window.MediaRecorder) {
-            console.warn('MediaRecorder is not supported in your browser');
-            return;
-        }
+    setupEventListeners() {
+        document.getElementById('addChannelBtn')?.addEventListener('click', async () => {
+            await this.audioManager.startAudio();
+            this.uiManager.showInstrumentDialog();
+        });
         
-        const toneContext = Tone.getContext();
-        const audioContext = toneContext.rawContext || toneContext._context;
-        mediaStreamDestination = audioContext.createMediaStreamDestination();
-        mediaStream = mediaStreamDestination.stream;
-    } catch (error) {
-        console.error('Recording setup error:', error);
-        alert('Recording feature is not available: ' + error.message);
-    }
-}
-
-async function init() {
-    Tone.Transport.bpm.value = currentTempo;
-    Tone.Transport.loop = true;
-    updateLoopEnd(); // Set initial loop end based on bar count
-    setupEventListeners();
-    
-    // Update the bars select to show the correct initial value
-    const barsSelect = document.getElementById('barsSelect');
-    if (barsSelect) {
-        barsSelect.value = barCount.toString();
-    }
-    
-    // Auto-initialize audio and create demo setup on page load
-    await initializeAudioAndDemo();
-}
-
-async function initializeAudioAndDemo() {
-    try {
-        showLoadingIndicator(true, 'Loading Music Studio...');
-        
-        // Start audio context
-        await startAudio();
-        
-        // Create demo setup
-        createDemoSetup();
-        
-        showLoadingIndicator(false);
-    } catch (error) {
-        console.error('Initialization error:', error);
-        showLoadingIndicator(false);
-        
-        // If auto-start fails (some browsers require user interaction), show simple message
-        showStartPrompt();
-    }
-}
-
-function showStartPrompt() {
-    // Create demo setup first so everything is visible
-    createDemoSetup();
-    
-    const prompt = document.createElement('div');
-    prompt.id = 'startPrompt';
-    prompt.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(45, 45, 58, 0.95);
-        border: 2px solid #667eea;
-        border-radius: 15px;
-        padding: 30px 50px;
-        text-align: center;
-        z-index: 2000;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(10px);
-        animation: fadeIn 0.5s ease;
-    `;
-    
-    prompt.innerHTML = `
-        <div style="color: #667eea; font-size: 1.5em; font-weight: 600; margin-bottom: 10px;">
-            🎹 Click the piano below to begin
-        </div>
-        <div style="color: #aaa; font-size: 1em;">
-            or press any key (A-K)
-        </div>
-    `;
-    
-    document.body.appendChild(prompt);
-    
-    // Remove prompt on any piano key click or keyboard press
-    const removePrompt = async () => {
-        await startAudio();
-        prompt.remove();
-        document.removeEventListener('keydown', handleKeyPress);
-    };
-    
-    const handleKeyPress = (e) => {
-        if (keyboardMap[e.key.toLowerCase()] || ['z','x','c','v'].includes(e.key.toLowerCase())) {
-            removePrompt();
-        }
-    };
-    
-    document.addEventListener('keydown', handleKeyPress);
-    
-    document.querySelectorAll('.white-key, .black-key').forEach(key => {
-        key.addEventListener('click', removePrompt, { once: true });
-    });
-}
-
-function updateLoopEnd() {
-    Tone.Transport.loopEnd = `${barCount}m`;
-}
-
-function getTotalSteps() {
-    return gridSize * barCount;
-}
-
-function resizePatterns() {
-    const newTotalSteps = getTotalSteps();
-    
-    // Edge case: Validate new total steps
-    if (newTotalSteps <= 0 || newTotalSteps > 128) {
-        console.error('Invalid total steps:', newTotalSteps);
-        return;
-    }
-    
-    channels.forEach(channel => {
-        if (!channel.pattern) {
-            channel.pattern = Array(newTotalSteps).fill(null).map(() => ({}));
-            return;
-        }
-        
-        const oldPattern = channel.pattern;
-        const newPattern = Array(newTotalSteps).fill(null).map(() => ({}));
-        
-        // Copy over existing pattern data up to the minimum of old/new length
-        const copyLength = Math.min(oldPattern.length, newPattern.length);
-        for (let i = 0; i < copyLength; i++) {
-            newPattern[i] = { ...oldPattern[i] };
-        }
-        
-        channel.pattern = newPattern;
-    });
-}
-
-function addChannel(name, instrumentType = 'synth', waveType = 'sine') {
-    // Edge case: Check if too many channels
-    if (channels.length >= 16) {
-        alert('Maximum 16 channels reached. Please remove a channel before adding a new one.');
-        return null;
-    }
-    
-    // Edge case: Validate name
-    if (!name || name.trim().length === 0) {
-        name = `Channel ${channelIdCounter}`;
-    }
-    
-    const id = channelIdCounter++;
-    let instrument;
-    
-    // Create different instrument types
-    if (instrumentType === 'drums') {
-        // Create drum machine with individual drum sounds
-        instrument = {
-            kick: new Tone.MembraneSynth().toDestination(),
-            snare: new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.2 } }).toDestination(),
-            hihat: new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).toDestination(),
-            clap: new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.15 } }).toDestination()
-        };
-        // Connect to media stream
-        if (mediaStreamDestination) {
-            instrument.kick.connect(mediaStreamDestination);
-            instrument.snare.connect(mediaStreamDestination);
-            instrument.hihat.connect(mediaStreamDestination);
-            instrument.clap.connect(mediaStreamDestination);
-        }
-    } else if (instrumentType === 'bass') {
-        instrument = new Tone.MonoSynth({
-            oscillator: { type: 'sawtooth' },
-            envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.1 },
-            filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.2, baseFrequency: 200, octaves: 2.6 }
-        }).toDestination();
-        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -10;
-    } else if (instrumentType === 'acidbass') {
-        // TB-303 style acid bass for techno
-        instrument = new Tone.MonoSynth({
-            oscillator: { type: 'sawtooth' },
-            envelope: { attack: 0.001, decay: 0.1, sustain: 0.0, release: 0.01 },
-            filter: { Q: 15, type: 'lowpass', rolloff: -24 },
-            filterEnvelope: { 
-                attack: 0.001, 
-                decay: 0.15, 
-                sustain: 0.0, 
-                release: 0.1, 
-                baseFrequency: 50, 
-                octaves: 4.5,
-                exponent: 2
+        // Prevent default behavior to avoid scrolling when focused
+        document.getElementById('tempoInput')?.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            // Edge case: Clamp tempo value
+            const clampedValue = Math.max(40, Math.min(200, value || 120));
+            if (!isNaN(clampedValue)) {
+                this.sequencer.setTempo(clampedValue);
+                e.target.value = clampedValue;
             }
-        }).toDestination();
-        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -8;
-    } else if (instrumentType === 'fmsynth') {
-        // FM synthesis for lead sounds
-        instrument = new Tone.FMSynth({
-            harmonicity: 3,
-            modulationIndex: 10,
-            oscillator: { type: 'sine' },
-            envelope: { attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.1 },
-            modulation: { type: 'square' },
-            modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.0, release: 0.1 }
-        }).toDestination();
-        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -12;
-    } else if (instrumentType === 'epiano') {
-        // Electric Piano for jazz
-        instrument = new Tone.PolySynth(Tone.FMSynth, {
-            harmonicity: 1.5,
-            modulationIndex: 2,
-            oscillator: { type: 'sine' },
-            envelope: { attack: 0.001, decay: 1.5, sustain: 0.0, release: 0.8 },
-            modulation: { type: 'sine' },
-            modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0.0, release: 0.5 }
-        }).toDestination();
-        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -8;
-    } else if (instrumentType === 'vibraphone') {
-        // Vibraphone for jazz
-        instrument = new Tone.PolySynth(Tone.FMSynth, {
-            harmonicity: 2,
-            modulationIndex: 1.5,
-            oscillator: { type: 'sine' },
-            envelope: { attack: 0.001, decay: 2.0, sustain: 0.3, release: 2.5 },
-            modulation: { type: 'sine' },
-            modulationEnvelope: { attack: 0.5, decay: 1.0, sustain: 0.2, release: 1.5 }
-        }).toDestination();
-        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -10;
-    } else if (instrumentType === 'uprightbass') {
-        // Upright/Double Bass for jazz
-        instrument = new Tone.MonoSynth({
-            oscillator: { type: 'triangle' },
-            envelope: { attack: 0.01, decay: 0.4, sustain: 0.2, release: 0.3 },
-            filterEnvelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.2, baseFrequency: 100, octaves: 1.5 }
-        }).toDestination();
-        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -6;
-    } else if (instrumentType === 'pad') {
-        instrument = new Tone.PolySynth(Tone.Synth, {
-            oscillator: { type: 'sine' },
-            envelope: { attack: 0.8, decay: 0.5, sustain: 0.8, release: 2.0 }
-        }).toDestination();
-        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -15;
-    } else if (instrumentType === 'pluck') {
-        // MonoSynth configured to sound like a plucked string
-        instrument = new Tone.MonoSynth({
-            oscillator: { type: 'sawtooth' },
-            envelope: { attack: 0.001, decay: 0.1, sustain: 0.0, release: 0.2 },
-            filterEnvelope: { attack: 0.001, decay: 0.2, sustain: 0.0, release: 0.2, baseFrequency: 2000, octaves: 2.5 }
-        }).toDestination();
-        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -10;
-    } else {
-        // Default synth
-        instrument = new Tone.PolySynth(Tone.Synth, {
-            oscillator: { type: waveType },
-            envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.2 }
-        }).toDestination();
-        if (mediaStreamDestination) instrument.connect(mediaStreamDestination);
-        instrument.volume.value = -10;
-    }
-    
-    const channel = { 
-        id, 
-        name, 
-        synth: instrument, 
-        instrumentType,
-        waveType, 
-        volume: 0.7, 
-        muted: false, 
-        attack: 10, 
-        release: 200,
-        pattern: Array(getTotalSteps()).fill(null).map(() => ({})) // Dynamic pattern size
-    };
-    channels.push(channel);
-    
-    // Don't render here - let the caller decide when to render to avoid lag
-    // Rendering is done in showInstrumentDialog or createDemoSetup
-    selectChannel(id);
-    return channel;
-}
-
-function selectChannel(id) {
-    // Edge case: Validate channel exists
-    const channel = channels.find(ch => ch.id === id);
-    if (!channel) {
-        console.warn('Channel not found:', id);
-        return;
-    }
-    
-    selectedChannelId = id;
-    
-    // Use requestAnimationFrame to prevent UI lag
-    requestAnimationFrame(() => {
-        renderChannels();
-        renderSequencerGrid();
-    });
-}
-
-function getSelectedChannel() {
-    const channel = channels.find(ch => ch.id === selectedChannelId);
-    // Edge case: If selected channel doesn't exist, select the first one
-    if (!channel && channels.length > 0) {
-        selectedChannelId = channels[0].id;
-        return channels[0];
-    }
-    return channel;
-}
-
-function playNote(channel, note, time = undefined) {
-    if (!channel || channel.muted || channel.instrumentType === 'drums') {
-        return;
-    }
-    
-    try {
-        if (channel.instrumentType === 'bass' || channel.instrumentType === 'acidbass' || channel.instrumentType === 'uprightbass') {
-            // Mono synths for bass sounds
-            channel.synth.triggerAttackRelease(note, '8n', time);
-        } else if (channel.instrumentType === 'pluck') {
-            // Pluck needs a different duration for proper sound
-            channel.synth.triggerAttackRelease(note, '4n', time);
-        } else if (channel.instrumentType === 'fmsynth') {
-            // FM synth with shorter duration for punchier sound
-            channel.synth.triggerAttackRelease(note, '16n', time);
-        } else if (channel.instrumentType === 'epiano') {
-            // Electric piano with medium sustain
-            channel.synth.triggerAttackRelease(note, '4n', time);
-        } else if (channel.instrumentType === 'vibraphone') {
-            // Vibraphone with long sustain
-            channel.synth.triggerAttackRelease(note, '2n', time);
-        } else {
-            // Default synths and pads
-            channel.synth.triggerAttackRelease(note, '8n', time);
-        }
-    } catch (error) {
-        console.error('Error playing note:', error);
-    }
-}
-
-function playDrum(channel, drumType, time = undefined) {
-    if (!channel || channel.muted || channel.instrumentType !== 'drums') return;
-    
-    try {
-        switch(drumType) {
-            case 'kick':
-                channel.synth.kick.triggerAttackRelease('C1', '8n', time);
-                break;
-            case 'snare':
-                channel.synth.snare.triggerAttack(time);
-                break;
-            case 'hihat':
-                channel.synth.hihat.triggerAttackRelease('16n', time);
-                break;
-            case 'clap':
-                channel.synth.clap.triggerAttack(time);
-                break;
-        }
-    } catch (error) {
-        console.error('Error playing drum:', error);
-    }
-}
-
-function releaseAllNotes() {
-    // Release all active notes from all instruments to prevent stuck notes
-    channels.forEach(channel => {
-        if (channel && channel.synth) {
-            try {
-                if (channel.instrumentType === 'drums') {
-                    // For drums, just stop the synths
-                    if (channel.synth.kick) channel.synth.kick.triggerRelease();
-                    if (channel.synth.snare && channel.synth.snare.noise) {
-                        channel.synth.snare.noise.stop();
-                    }
-                    if (channel.synth.hihat && channel.synth.hihat.noise) {
-                        channel.synth.hihat.noise.stop();
-                    }
-                    if (channel.synth.clap && channel.synth.clap.noise) {
-                        channel.synth.clap.noise.stop();
-                    }
-                } else {
-                    // For melodic instruments, release all notes
-                    channel.synth.releaseAll();
-                }
-            } catch (error) {
-                console.error('Error releasing notes for channel:', channel.name, error);
-            }
-        }
-    });
-}
-
-function showInstrumentDialog() {
-    // Edge case: Check max channels
-    if (channels.length >= 16) {
-        alert('Maximum 16 channels reached. Please remove a channel before adding a new one.');
-        return;
-    }
-    
-    // Pause playback to prevent stuck notes
-    const wasPlaying = isPlaying;
-    if (isPlaying) {
-        Tone.Transport.stop();
-        stopSequencer();
-        isPlaying = false;
-        // Release all notes from all instruments
-        releaseAllNotes();
-    }
-    
-    const instrumentType = prompt(
-        '🎹 Choose instrument type:\n\n' +
-        'BASIC INSTRUMENTS:\n' +
-        '1 - Synth (Lead/Melody)\n' +
-        '2 - Bass (Deep sound)\n' +
-        '3 - Pad (Ambient)\n' +
-        '4 - Pluck (Guitar-like)\n' +
-        '5 - Drums (Percussion)\n\n' +
-        'TECHNO/ELECTRONIC:\n' +
-        '6 - Acid Bass (TB-303 style)\n' +
-        '7 - FM Synth (Aggressive leads)\n\n' +
-        'JAZZ/ACOUSTIC:\n' +
-        '8 - Electric Piano\n' +
-        '9 - Vibraphone\n' +
-        '10 - Upright Bass\n\n' +
-        'Enter number (1-10):',
-        '1'
-    );
-    
-    if (!instrumentType) {
-        // Resume playback if it was playing
-        if (wasPlaying) {
-            Tone.Transport.start();
-            startSequencer();
-            isPlaying = true;
-        }
-        return;
-    }
-    
-    // Validate input
-    if (!/^([1-9]|10)$/.test(instrumentType.trim())) {
-        alert('Invalid choice. Please enter a number between 1 and 10.');
-        // Resume playback if it was playing
-        if (wasPlaying) {
-            Tone.Transport.start();
-            startSequencer();
-            isPlaying = true;
-        }
-        return;
-    }
-    
-    const types = {
-        '1': { type: 'synth', name: 'Lead' },
-        '2': { type: 'bass', name: 'Bass' },
-        '3': { type: 'pad', name: 'Pad' },
-        '4': { type: 'pluck', name: 'Pluck' },
-        '5': { type: 'drums', name: 'Drums' },
-        '6': { type: 'acidbass', name: 'Acid Bass' },
-        '7': { type: 'fmsynth', name: 'FM Synth' },
-        '8': { type: 'epiano', name: 'E-Piano' },
-        '9': { type: 'vibraphone', name: 'Vibraphone' },
-        '10': { type: 'uprightbass', name: 'Upright Bass' }
-    };
-    
-    const selected = types[instrumentType.trim()];
-    if (!selected) {
-        alert('Invalid choice');
-        // Resume playback if it was playing
-        if (wasPlaying) {
-            Tone.Transport.start();
-            startSequencer();
-            isPlaying = true;
-        }
-        return;
-    }
-    
-    const name = prompt('Channel name:', `${selected.name} ${channels.length + 1}`);
-    if (name && name.trim()) {
-        const newChannel = addChannel(name.trim(), selected.type, 'sine');
+        });
         
-        // Use requestAnimationFrame to prevent lag during UI update
-        if (newChannel) {
+        document.getElementById('gridSelect')?.addEventListener('change', (e) => {
+            this.saveUndoState();
+            this.sequencer.setGridSize(parseInt(e.target.value));
+            
+            // Restart sequencer if playing to prevent issues with note timing
+            if (this.sequencer.getIsPlaying()) {
+                this.sequencer.stopSequencer();
+                Tone.Transport.stop();
+                this.sequencer.currentStep = 0;
+                Tone.Transport.start();
+                this.sequencer.startSequencer();
+            }
+            
+            // Use requestAnimationFrame to prevent lag
             requestAnimationFrame(() => {
-                renderChannels();
-                renderMixerChannels();
-                renderSequencerGrid();
+                this.uiManager.renderSequencerGrid();
             });
-        }
-    }
-    
-    // Resume playback if it was playing
-    if (wasPlaying) {
-        Tone.Transport.start();
-        startSequencer();
-        isPlaying = true;
-    }
-}
-
-function updateChannel(id, property, value) {
-    const channel = channels.find(ch => ch.id === id);
-    if (!channel) return;
-    
-    // Edge case: Validate volume range
-    if (property === 'volume') {
-        value = Math.max(0, Math.min(1, value));
-    }
-    
-    channel[property] = value;
-    
-    if (channel.instrumentType === 'drums') {
-        // Handle drum channels differently
-        if (property === 'volume') {
-            const volumeValue = -20 + (value * 20);
-            channel.synth.kick.volume.value = volumeValue;
-            channel.synth.snare.volume.value = volumeValue;
-            channel.synth.hihat.volume.value = volumeValue;
-            channel.synth.clap.volume.value = volumeValue;
-        } else if (property === 'muted') {
-            const volumeValue = value ? -Infinity : -20 + (channel.volume * 20);
-            channel.synth.kick.volume.value = volumeValue;
-            channel.synth.snare.volume.value = volumeValue;
-            channel.synth.hihat.volume.value = volumeValue;
-            channel.synth.clap.volume.value = volumeValue;
-        }
-    } else {
-        // Handle regular instrument channels
-        if (property === 'waveType') {
-            // Update the waveType for synths
-            if (channel.instrumentType === 'synth' || channel.instrumentType === 'pad') {
-                channel.synth.set({ oscillator: { type: value } });
-            }
-        } else if (property === 'volume') {
-            channel.synth.volume.value = -20 + (value * 20);
-        } else if (property === 'muted') {
-            channel.synth.volume.value = value ? -Infinity : -20 + (channel.volume * 20);
-        } else if (property === 'attack' || property === 'release') {
-            // Only update envelope for instruments that support it (not FM synths, pluck, or special instruments)
-            const supportsEnvelope = ['synth', 'bass', 'pad', 'pluck', 'acidbass', 'uprightbass'].includes(channel.instrumentType);
-            if (supportsEnvelope && channel.synth.envelope) {
-                try {
-                    channel.synth.set({ envelope: { attack: channel.attack / 1000, release: channel.release / 1000 } });
-                } catch (error) {
-                    console.warn('Could not update envelope for', channel.instrumentType);
-                }
-            }
-        }
-    }
-    
-    // Only re-render mixer if volume or mute changed (avoid unnecessary re-renders)
-    if (property === 'volume' || property === 'muted') {
-        requestAnimationFrame(() => {
-            renderMixerChannels();
-        });
-    }
-}
-
-// Make updateChannel available globally for inline event handlers
-window.updateChannel = updateChannel;
-
-function removeChannel(id) {
-    const index = channels.findIndex(ch => ch.id === id);
-    if (index === -1) return;
-    
-    // Edge case: Don't allow removing the last channel
-    if (channels.length === 1) {
-        alert('Cannot remove the last channel. Keep at least one channel in your project.');
-        return;
-    }
-    
-    // Pause playback to prevent stuck notes
-    const wasPlaying = isPlaying;
-    if (isPlaying) {
-        Tone.Transport.stop();
-        stopSequencer();
-        isPlaying = false;
-        // Release all notes from all instruments
-        releaseAllNotes();
-    }
-    
-    // Save state for undo
-    saveUndoState();
-    
-    const channel = channels[index];
-    
-    try {
-        // Release all notes before disposing
-        if (channel.instrumentType === 'drums') {
-            // For drums, stop all active sounds
-            if (channel.synth.kick) channel.synth.kick.triggerRelease();
-            if (channel.synth.snare && channel.synth.snare.noise) {
-                channel.synth.snare.noise.stop();
-            }
-            if (channel.synth.hihat && channel.synth.hihat.noise) {
-                channel.synth.hihat.noise.stop();
-            }
-            if (channel.synth.clap && channel.synth.clap.noise) {
-                channel.synth.clap.noise.stop();
-            }
-        } else {
-            // For melodic instruments, release all notes
-            if (channel.synth && channel.synth.releaseAll) {
-                channel.synth.releaseAll();
-            }
-        }
-        
-        // Small delay to allow notes to release
-        setTimeout(() => {
-            // Dispose instruments properly based on type
-            if (channel.instrumentType === 'drums') {
-                // Drums have multiple synths
-                if (channel.synth.kick) channel.synth.kick.dispose();
-                if (channel.synth.snare) channel.synth.snare.dispose();
-                if (channel.synth.hihat) channel.synth.hihat.dispose();
-                if (channel.synth.clap) channel.synth.clap.dispose();
-            } else {
-                // Regular instruments have a single synth
-                if (channel.synth) channel.synth.dispose();
-            }
-        }, 50);
-    } catch (error) {
-        console.error('Error disposing instrument:', error);
-    }
-    
-    channels.splice(index, 1);
-    if (selectedChannelId === id && channels.length > 0) {
-        selectedChannelId = channels[0].id;
-    } else if (channels.length === 0) {
-        selectedChannelId = null;
-    }
-    
-    // Use requestAnimationFrame to prevent lag
-    requestAnimationFrame(() => {
-        renderChannels();
-        renderMixerChannels();
-        renderSequencerGrid();
-    });
-    
-    // Resume playback if it was playing
-    if (wasPlaying) {
-        setTimeout(() => {
-            Tone.Transport.start();
-            startSequencer();
-            isPlaying = true;
-        }, 100);
-    }
-}
-
-// Make removeChannel available globally for inline event handlers
-window.removeChannel = removeChannel;
-
-function renderChannels() {
-    const channelsList = document.getElementById('channelsList');
-    if (!channelsList) return;
-    
-    // Use DocumentFragment for better performance
-    const fragment = document.createDocumentFragment();
-    
-    channels.forEach(channel => {
-        const div = document.createElement('div');
-        div.className = `channel-item ${channel.id === selectedChannelId ? 'selected' : ''}`;
-        div.onclick = () => selectChannel(channel.id);
-        
-        // Get display name for instrument type
-        const instrumentDisplayName = {
-            'synth': 'Synth',
-            'bass': 'Bass',
-            'acidbass': 'Acid Bass',
-            'fmsynth': 'FM Synth',
-            'epiano': 'E-Piano',
-            'vibraphone': 'Vibraphone',
-            'uprightbass': 'Upright Bass',
-            'pad': 'Pad',
-            'pluck': 'Pluck',
-            'drums': 'Drums'
-        }[channel.instrumentType] || channel.instrumentType;
-        
-        // Show different settings based on instrument type
-        const settingsHTML = channel.instrumentType === 'drums' ? `
-            <div class="channel-settings">
-                <div class="setting-item" style="grid-column: 1 / -1;">
-                    <label>Drums</label>
-                    <div style="font-size: 0.75em; color: #888;">Kick, Snare, HiHat, Clap</div>
-                </div>
-            </div>
-        ` : (channel.instrumentType === 'acidbass' || channel.instrumentType === 'fmsynth') ? `
-            <div class="channel-settings">
-                <div class="setting-item" style="grid-column: 1 / -1;">
-                    <label>${instrumentDisplayName}</label>
-                    <div style="font-size: 0.75em; color: #888;">
-                        ${channel.instrumentType === 'acidbass' ? 'TB-303 style' : 'FM synthesis'}
-                    </div>
-                </div>
-            </div>
-        ` : (channel.instrumentType === 'epiano' || channel.instrumentType === 'vibraphone' || channel.instrumentType === 'uprightbass') ? `
-            <div class="channel-settings">
-                <div class="setting-item" style="grid-column: 1 / -1;">
-                    <label>${instrumentDisplayName}</label>
-                    <div style="font-size: 0.75em; color: #888;">Jazz/Acoustic</div>
-                </div>
-            </div>
-        ` : `
-            <div class="channel-settings">
-                <div class="setting-item">
-                    <label>Type</label>
-                    <select onchange="updateChannel(${channel.id}, 'waveType', this.value)" onclick="event.stopPropagation()" ${(channel.instrumentType === 'synth' || channel.instrumentType === 'pad') ? '' : 'disabled'}>
-                        <option value="sine" ${channel.waveType==='sine'?'selected':''}>Sine</option>
-                        <option value="square" ${channel.waveType==='square'?'selected':''}>Square</option>
-                        <option value="triangle" ${channel.waveType==='triangle'?'selected':''}>Triangle</option>
-                        <option value="sawtooth" ${channel.waveType==='sawtooth'?'selected':''}>Saw</option>
-                    </select>
-                </div>
-                <div class="setting-item">
-                    <label>Attack</label>
-                    <input type="range" min="0" max="500" value="${channel.attack}" step="10" 
-                           onchange="updateChannel(${channel.id}, 'attack', parseInt(this.value))" onclick="event.stopPropagation()">
-                </div>
-            </div>
-        `;
-        
-        div.innerHTML = `
-            <div class="channel-header">
-                <div class="channel-name-display">${channel.name} <span style="font-size:0.8em;color:#888;">[${instrumentDisplayName}]</span></div>
-                <button class="channel-btn" onclick="event.stopPropagation(); removeChannel(${channel.id})">✕</button>
-            </div>
-            ${settingsHTML}
-        `;
-        fragment.appendChild(div);
-    });
-    
-    // Clear and append all at once
-    channelsList.innerHTML = '';
-    channelsList.appendChild(fragment);
-}
-
-function renderMixerChannels() {
-    const mixerChannels = document.getElementById('mixerChannels');
-    if (!mixerChannels) return;
-    
-    // Use DocumentFragment for better performance
-    const fragment = document.createDocumentFragment();
-    
-    channels.forEach(channel => {
-        const div = document.createElement('div');
-        div.className = 'mixer-channel';
-        div.innerHTML = `
-            <div class="channel-name">${channel.name}</div>
-            <input type="range" class="volume-slider" min="0" max="1" value="${channel.volume}" step="0.01"
-                   oninput="updateChannel(${channel.id}, 'volume', parseFloat(this.value))">
-            <div class="volume-label">${Math.round(channel.volume*100)}%</div>
-            <div class="mixer-controls">
-                <button class="mixer-btn ${channel.muted?'active':''}" 
-                        onclick="updateChannel(${channel.id}, 'muted', !${channel.muted})">M</button>
-            </div>
-        `;
-        fragment.appendChild(div);
-    });
-    
-    // Clear and append all at once
-    mixerChannels.innerHTML = '';
-    mixerChannels.appendChild(fragment);
-}
-
-function renderSequencerGrid() {
-    const grid = document.getElementById('sequencerGrid');
-    if (!grid) return;
-    
-    const channel = channels.find(c => c.id === selectedChannelId);
-    if (!channel) {
-        document.getElementById('selectedChannelName').textContent = 'None';
-        grid.innerHTML = '<div style="color: #888; padding: 20px; text-align: center;">Select a channel to edit patterns</div>';
-        return;
-    }
-    
-    document.getElementById('selectedChannelName').textContent = channel.name;
-    
-    const rowLabels = channel.instrumentType === 'drums' ? drumLabels : notes;
-    const totalSteps = getTotalSteps();
-    
-    // Use DocumentFragment for much better performance
-    const fragment = document.createDocumentFragment();
-    
-    rowLabels.forEach((label, rowIndex) => {
-        const row = document.createElement('div');
-        row.className = 'sequencer-row';
-        // Set dynamic grid columns
-        row.style.gridTemplateColumns = `80px repeat(${totalSteps}, 35px)`;
-        
-        const labelDiv = document.createElement('div');
-        labelDiv.className = 'sequencer-label';
-        // Capitalize first letter for drums
-        labelDiv.textContent = channel.instrumentType === 'drums' 
-            ? label.charAt(0).toUpperCase() + label.slice(1) 
-            : label;
-        row.appendChild(labelDiv);
-        
-        for (let stepIndex = 0; stepIndex < totalSteps; stepIndex++) {
-            const step = document.createElement('div');
-            step.className = 'sequencer-step';
-            if (stepIndex % 4 === 0) step.classList.add('beat');
-            
-            const isActive = channel.pattern[stepIndex] && channel.pattern[stepIndex][label];
-            if (isActive) step.classList.add('active');
-            
-            // Use closure to capture values correctly
-            step.addEventListener('click', ((currentStep, currentLabel) => {
-                return () => {
-                    // Save state for undo
-                    saveUndoState();
-                    
-                    if (!channel.pattern[currentStep]) {
-                        channel.pattern[currentStep] = {};
-                    }
-                    channel.pattern[currentStep][currentLabel] = !channel.pattern[currentStep][currentLabel];
-                    step.classList.toggle('active');
-                };
-            })(stepIndex, label));
-            
-            row.appendChild(step);
-        }
-        
-        fragment.appendChild(row);
-    });
-    
-    // Clear and append all at once for better performance
-    grid.innerHTML = '';
-    grid.appendChild(fragment);
-}
-
-function startSequencer() {
-    if (sequencerLoop) return;
-    
-    currentStep = 0;
-    const totalSteps = getTotalSteps();
-    const noteValue = gridSize === 16 ? '16n' : gridSize === 8 ? '8n' : '4n';
-    
-    sequencerLoop = new Tone.Loop((time) => {
-        channels.forEach(channel => {
-            if (channel.muted) return; // Skip muted channels
-            
-            const step = channel.pattern[currentStep];
-            if (step && channel.instrumentType === 'drums') {
-                drumLabels.forEach(drumType => {
-                    if (step[drumType]) {
-                        playDrum(channel, drumType, time);
-                    }
-                });
-            } else if (step) {
-                notes.forEach(note => {
-                    if (step[note]) {
-                        playNote(channel, note, time);
-                    }
-                });
-            }
         });
         
-        // Update beat counter
-        const bar = Math.floor(currentStep / gridSize) + 1;
-        const beat = Math.floor((currentStep % gridSize) / 4) + 1;
-        const tick = (currentStep % 4) + 1;
-        
-        // Visual feedback
-        Tone.Draw.schedule(() => {
-            // Update beat counter display
-            const beatCounter = document.getElementById('beatCounter');
-            if (beatCounter) {
-                beatCounter.textContent = `${bar}.${beat}.${tick}`;
+        document.getElementById('barsSelect')?.addEventListener('change', (e) => {
+            this.saveUndoState();
+            this.sequencer.setBarCount(parseInt(e.target.value));
+            
+            // Restart sequencer if playing to prevent currentStep from being out of bounds
+            if (this.sequencer.getIsPlaying()) {
+                this.sequencer.stopSequencer();
+                Tone.Transport.stop();
+                this.sequencer.currentStep = 0;
+                Tone.Transport.start();
+                this.sequencer.startSequencer();
             }
             
-            // Highlight current step
-            document.querySelectorAll('.sequencer-step').forEach((el, index) => {
-                const stepPos = index % totalSteps;
-                if (stepPos === currentStep) {
-                    el.style.borderColor = '#667eea';
-                    el.style.boxShadow = '0 0 10px rgba(102, 126, 234, 0.5)';
-                } else if (el.classList.contains('beat')) {
-                    el.style.borderColor = '#555';
-                    el.style.boxShadow = 'none';
-                } else {
-                    el.style.borderColor = '#3a3a4a';
-                    el.style.boxShadow = 'none';
-                }
+            // Use requestAnimationFrame to prevent lag
+            requestAnimationFrame(() => {
+                this.uiManager.renderSequencerGrid();
             });
-        }, time);
-        
-        currentStep = (currentStep + 1) % totalSteps;
-    }, noteValue);
-    
-    sequencerLoop.start(0);
-}
-
-function stopSequencer() {
-    if (sequencerLoop) {
-        sequencerLoop.stop();
-        sequencerLoop.dispose();
-        sequencerLoop = null;
-    }
-    currentStep = 0;
-    
-    // Reset beat counter
-    const beatCounter = document.getElementById('beatCounter');
-    if (beatCounter) {
-        beatCounter.textContent = '1.1.1';
-    }
-    
-    // Reset visual feedback
-    document.querySelectorAll('.sequencer-step').forEach(el => {
-        if (el.classList.contains('beat')) {
-            el.style.borderColor = '#555';
-        } else {
-            el.style.borderColor = '#3a3a4a';
-        }
-        el.style.boxShadow = 'none';
-    });
-}
-
-function setupEventListeners() {
-    document.getElementById('addChannelBtn')?.addEventListener('click', async () => {
-        await startAudio();
-        showInstrumentDialog();
-    });
-    
-    // Prevent default behavior to avoid scrolling when focused
-    document.getElementById('tempoInput')?.addEventListener('input', (e) => {
-        const value = parseInt(e.target.value);
-        // Edge case: Clamp tempo value
-        const clampedValue = Math.max(40, Math.min(200, value || 120));
-        if (!isNaN(clampedValue)) {
-            currentTempo = clampedValue;
-            Tone.Transport.bpm.value = currentTempo;
-            e.target.value = clampedValue;
-        }
-    });
-    
-    document.getElementById('gridSelect')?.addEventListener('change', (e) => {
-        saveUndoState();
-        gridSize = parseInt(e.target.value);
-        resizePatterns();
-        
-        // Restart sequencer if playing to prevent issues with note timing
-        if (isPlaying) {
-            stopSequencer();
-            Tone.Transport.stop();
-            currentStep = 0;
-            Tone.Transport.start();
-            startSequencer();
-        }
-        
-        // Use requestAnimationFrame to prevent lag
-        requestAnimationFrame(() => {
-            renderSequencerGrid();
-        });
-    });
-    
-    document.getElementById('barsSelect')?.addEventListener('change', (e) => {
-        saveUndoState();
-        barCount = parseInt(e.target.value);
-        updateLoopEnd();
-        resizePatterns();
-        
-        // Restart sequencer if playing to prevent currentStep from being out of bounds
-        if (isPlaying) {
-            stopSequencer();
-            Tone.Transport.stop();
-            currentStep = 0;
-            Tone.Transport.start();
-            startSequencer();
-        }
-        
-        // Use requestAnimationFrame to prevent lag
-        requestAnimationFrame(() => {
-            renderSequencerGrid();
-        });
-    });
-    
-    document.getElementById('playBtn')?.addEventListener('click', togglePlay);
-    document.getElementById('stopBtn')?.addEventListener('click', stop);
-    document.getElementById('exportBtn')?.addEventListener('click', exportLoop);
-    
-    document.getElementById('guideToggle')?.addEventListener('click', () => {
-        document.getElementById('guideOverlay')?.classList.toggle('hidden');
-    });
-    document.getElementById('closeGuide')?.addEventListener('click', () => {
-        document.getElementById('guideOverlay')?.classList.add('hidden');
-    });
-    
-    document.querySelectorAll('.white-key, .black-key').forEach(key => {
-        // Mouse events
-        key.addEventListener('mousedown', async (e) => {
-            e.preventDefault();
-            await startAudio();
-            const note = key.getAttribute('data-note');
-            const channel = getSelectedChannel();
-            if (note && channel) {
-                playNote(channel, note);
-                key.classList.add('active');
-                setTimeout(() => key.classList.remove('active'), 300);
-            }
         });
         
-        // Touch events for mobile
-        key.addEventListener('touchstart', async (e) => {
-            e.preventDefault();
-            await startAudio();
-            const note = key.getAttribute('data-note');
-            const channel = getSelectedChannel();
-            if (note && channel) {
-                playNote(channel, note);
-                key.classList.add('active');
-                setTimeout(() => key.classList.remove('active'), 300);
-            }
+        document.getElementById('playBtn')?.addEventListener('click', () => this.sequencer.togglePlay());
+        document.getElementById('stopBtn')?.addEventListener('click', () => this.sequencer.stop());
+        document.getElementById('exportBtn')?.addEventListener('click', () => this.exportManager.exportLoop());
+        
+        document.getElementById('guideToggle')?.addEventListener('click', () => {
+            document.getElementById('guideOverlay')?.classList.toggle('hidden');
+        });
+        document.getElementById('closeGuide')?.addEventListener('click', () => {
+            document.getElementById('guideOverlay')?.classList.add('hidden');
         });
         
-        // Keyboard support
-        key.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+        document.querySelectorAll('.white-key, .black-key').forEach(key => {
+            // Mouse events
+            key.addEventListener('mousedown', async (e) => {
                 e.preventDefault();
-                await startAudio();
+                await this.audioManager.startAudio();
                 const note = key.getAttribute('data-note');
-                const channel = getSelectedChannel();
+                const channel = this.channelManager.getSelectedChannel();
                 if (note && channel) {
-                    playNote(channel, note);
+                    this.channelManager.playNote(channel, note);
                     key.classList.add('active');
                     setTimeout(() => key.classList.remove('active'), 300);
                 }
+            });
+            
+            // Touch events for mobile
+            key.addEventListener('touchstart', async (e) => {
+                e.preventDefault();
+                await this.audioManager.startAudio();
+                const note = key.getAttribute('data-note');
+                const channel = this.channelManager.getSelectedChannel();
+                if (note && channel) {
+                    this.channelManager.playNote(channel, note);
+                    key.classList.add('active');
+                    setTimeout(() => key.classList.remove('active'), 300);
+                }
+            });
+            
+            // Keyboard support
+            key.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    await this.audioManager.startAudio();
+                    const note = key.getAttribute('data-note');
+                    const channel = this.channelManager.getSelectedChannel();
+                    if (note && channel) {
+                        this.channelManager.playNote(channel, note);
+                        key.classList.add('active');
+                        setTimeout(() => key.classList.remove('active'), 300);
+                    }
+                }
+            });
+        });
+        
+        const pressedKeys = new Set();
+        const drumKeys = { 'z': 'kick', 'x': 'snare', 'c': 'hihat', 'v': 'clap' };
+        
+        document.addEventListener('keydown', async (e) => {
+            // Don't trigger shortcuts when typing in inputs
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            
+            // Space bar - Play/Pause
+            if (e.code === 'Space') { 
+                e.preventDefault(); 
+                this.sequencer.togglePlay(); 
+                return; 
+            }
+            
+            // Delete key - clear pattern for selected channel
+            if (e.key === 'Delete' && this.channelManager.getSelectedChannelId()) {
+                e.preventDefault();
+                this.sequencer.clearPattern();
+                this.uiManager.renderSequencerGrid();
+                return;
+            }
+            
+            // Ctrl+Z - Undo
+            if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.undo();
+                return;
+            }
+            
+            // Ctrl+Shift+Z or Ctrl+Y - Redo
+            if ((e.ctrlKey && e.shiftKey && e.key === 'z') || (e.ctrlKey && e.key === 'y')) {
+                e.preventDefault();
+                this.redo();
+                return;
+            }
+            
+            // Escape - Stop playback
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.sequencer.stop();
+                return;
+            }
+            
+            const key = e.key.toLowerCase();
+            if (pressedKeys.has(key)) return;
+            pressedKeys.add(key);
+            
+            await this.audioManager.startAudio();
+            const channel = this.channelManager.getSelectedChannel();
+            if (!channel || channel.muted) return;
+            
+            // Check if it's a drum key
+            if (drumKeys[key] && channel.instrumentType === 'drums') {
+                this.channelManager.playDrum(channel, drumKeys[key]);
+            } else {
+                const note = this.uiManager.getKeyboardMap()[key];
+                if (note) {
+                    this.channelManager.playNote(channel, note);
+                    document.querySelector(`[data-note="${note}"]`)?.classList.add('active');
+                }
             }
         });
-    });
-    
-    const pressedKeys = new Set();
-    const drumKeys = { 'z': 'kick', 'x': 'snare', 'c': 'hihat', 'v': 'clap' };
-    
-    document.addEventListener('keydown', async (e) => {
-        // Don't trigger shortcuts when typing in inputs
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
-            return;
-        }
         
-        // Space bar - Play/Pause
-        if (e.code === 'Space') { 
-            e.preventDefault(); 
-            togglePlay(); 
-            return; 
-        }
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            pressedKeys.delete(key);
+            const note = this.uiManager.getKeyboardMap()[key];
+            if (note) document.querySelector(`[data-note="${note}"]`)?.classList.remove('active');
+        });
         
-        // Delete key - clear pattern for selected channel
-        if (e.key === 'Delete' && selectedChannelId) {
-            e.preventDefault();
-            clearPattern();
-            return;
-        }
-        
-        // Ctrl+Z - Undo
-        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
-            e.preventDefault();
-            undo();
-            return;
-        }
-        
-        // Ctrl+Shift+Z or Ctrl+Y - Redo
-        if ((e.ctrlKey && e.shiftKey && e.key === 'z') || (e.ctrlKey && e.key === 'y')) {
-            e.preventDefault();
-            redo();
-            return;
-        }
-        
-        // Escape - Stop playback
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            stop();
-            return;
-        }
-        
-        const key = e.key.toLowerCase();
-        if (pressedKeys.has(key)) return;
-        pressedKeys.add(key);
-        
-        await startAudio();
-        const channel = getSelectedChannel();
-        if (!channel || channel.muted) return;
-        
-        // Check if it's a drum key
-        if (drumKeys[key] && channel.instrumentType === 'drums') {
-            playDrum(channel, drumKeys[key]);
-        } else {
-            const note = keyboardMap[key];
-            if (note) {
-                playNote(channel, note);
-                document.querySelector(`[data-note="${note}"]`)?.classList.add('active');
-            }
-        }
-    });
-    
-    document.addEventListener('keyup', (e) => {
-        const key = e.key.toLowerCase();
-        pressedKeys.delete(key);
-        const note = keyboardMap[key];
-        if (note) document.querySelector(`[data-note="${note}"]`)?.classList.remove('active');
-    });
-    
-    document.getElementById('masterVolume')?.addEventListener('input', (e) => {
-        Tone.Destination.volume.value = -20 + (parseFloat(e.target.value) * 20);
-        document.getElementById('masterVolumeLabel').textContent = Math.round(parseFloat(e.target.value)*100) + '%';
-    });
-}
+        document.getElementById('masterVolume')?.addEventListener('input', (e) => {
+            Tone.Destination.volume.value = -20 + (parseFloat(e.target.value) * 20);
+            document.getElementById('masterVolumeLabel').textContent = Math.round(parseFloat(e.target.value)*100) + '%';
+        });
+    }
 
-async function togglePlay() {
-    await startAudio();
-    if (isPlaying) {
-        Tone.Transport.pause();
-        stopSequencer();
-        isPlaying = false;
-    } else {
-        Tone.Transport.start();
-        startSequencer();
-        isPlaying = true;
-    }
-}
-
-function stop() {
-    Tone.Transport.stop();
-    stopSequencer();
-    isPlaying = false;
-}
-
-async function exportLoop() {
-    await startAudio();
-    
-    // Edge case: Check if there are any patterns
-    const hasPatterns = channels.some(ch => 
-        ch.pattern.some(step => Object.keys(step).length > 0)
-    );
-    
-    if (!hasPatterns) {
-        alert('No patterns to export! Add some notes to the grid first.');
-        return;
-    }
-    
-    if (!mediaStream) { 
-        alert('Audio stream not ready. Please wait for audio to initialize.'); 
-        return;
-    }
-    
-    // Save playback state
-    const wasPlaying = isPlaying;
-    if (isPlaying) {
-        Tone.Transport.stop();
-        stopSequencer();
-        isPlaying = false;
-        releaseAllNotes();
-    }
-    
-    // Mute the main destination so user doesn't hear the recording
-    const originalVolume = Tone.Destination.volume.value;
-    Tone.Destination.volume.value = -Infinity;
-    
-    showLoadingIndicator(true, 'Preparing export...');
-    
-    try {
-        // Check supported mime types
-        let mimeType = 'audio/webm';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'audio/webm;codecs=opus';
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-                mimeType = 'audio/ogg;codecs=opus';
-                if (!MediaRecorder.isTypeSupported(mimeType)) {
-                    throw new Error('No supported audio format found');
-                }
-            }
-        }
-        
-        recordedChunks = [];
-        recorder = new MediaRecorder(mediaStream, { mimeType });
-        
-        recorder.ondataavailable = (e) => { 
-            if (e.data.size > 0) recordedChunks.push(e.data); 
+    // Undo/Redo functionality
+    saveUndoState() {
+        const state = {
+            channels: JSON.parse(JSON.stringify(this.channelManager.getChannels().map(ch => ({
+                id: ch.id,
+                name: ch.name,
+                instrumentType: ch.instrumentType,
+                waveType: ch.waveType,
+                volume: ch.volume,
+                muted: ch.muted,
+                attack: ch.attack,
+                release: ch.release,
+                pattern: ch.pattern
+            })))),
+            selectedChannelId: this.channelManager.getSelectedChannelId(),
+            gridSize: this.sequencer.getGridSize(),
+            barCount: this.sequencer.getBarCount()
         };
         
-        recorder.onstop = () => {
-            const blob = new Blob(recordedChunks, { type: mimeType });
-            
-            // Stop playback and release all notes BEFORE restoring volume
-            Tone.Transport.stop();
-            stopSequencer();
-            releaseAllNotes();
-            
-            // Small delay to ensure all notes are released
-            setTimeout(() => {
-                // Restore original volume
-                Tone.Destination.volume.value = originalVolume;
-                
-                // Convert and download
-                convertAndDownloadMP3(blob);
-                
-                // Resume playback if it was playing before
-                if (wasPlaying) {
-                    setTimeout(() => {
-                        Tone.Transport.start();
-                        startSequencer();
-                        isPlaying = true;
-                    }, 100);
-                }
-            }, 50);
+        this.undoStack.push(state);
+        if (this.undoStack.length > this.MAX_UNDO_STACK) {
+            this.undoStack.shift();
+        }
+        this.redoStack = []; // Clear redo stack on new action
+    }
+
+    undo() {
+        if (this.undoStack.length === 0) {
+            // Silent fail for better UX
+            return;
+        }
+        
+        // Save current state to redo stack
+        const currentState = {
+            channels: JSON.parse(JSON.stringify(this.channelManager.getChannels().map(ch => ({
+                id: ch.id,
+                name: ch.name,
+                instrumentType: ch.instrumentType,
+                waveType: ch.waveType,
+                volume: ch.volume,
+                muted: ch.muted,
+                attack: ch.attack,
+                release: ch.release,
+                pattern: ch.pattern
+            })))),
+            selectedChannelId: this.channelManager.getSelectedChannelId(),
+            gridSize: this.sequencer.getGridSize(),
+            barCount: this.sequencer.getBarCount()
         };
+        this.redoStack.push(currentState);
         
-        recorder.start();
+        // Restore previous state
+        const state = this.undoStack.pop();
+        this.restoreState(state);
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) {
+            // Silent fail for better UX
+            return;
+        }
         
-        // Calculate loop duration
-        const loopDuration = Tone.Time(Tone.Transport.loopEnd).toSeconds();
+        // Save current state to undo stack
+        this.saveUndoState();
         
-        showLoadingIndicator(true, `Recording ${barCount} bar loop (silent)...`);
+        // Restore redo state
+        const state = this.redoStack.pop();
+        this.restoreState(state);
+    }
+
+    restoreState(state) {
+        // This is a simplified restore - in production you'd need to recreate instruments
+        this.channelManager.setSelectedChannelId(state.selectedChannelId);
+        this.sequencer.setGridSize(state.gridSize);
+        this.sequencer.setBarCount(state.barCount);
         
-        // Reset transport position to start of loop
-        Tone.Transport.position = 0;
-        currentStep = 0;
+        // Update patterns only (instruments remain)
+        state.channels.forEach(savedChannel => {
+            const channel = this.channelManager.getChannels().find(ch => ch.id === savedChannel.id);
+            if (channel) {
+                channel.pattern = savedChannel.pattern;
+                channel.volume = savedChannel.volume;
+                channel.muted = savedChannel.muted;
+            }
+        });
         
-        // Start playback for recording (but muted so user doesn't hear it)
-        Tone.Transport.start();
-        startSequencer();
+        this.sequencer.updateLoopEnd();
         
-        // Record for exactly one loop
-        setTimeout(() => {
-            recorder.stop();
-            
-            // Don't restore volume here - let recorder.onstop handle it
-            // This prevents the stuck note from playing loudly
-        }, loopDuration * 1000 + 100); // Add 100ms buffer
+        // Batch all UI updates together
+        requestAnimationFrame(() => {
+            this.uiManager.renderChannels();
+            this.uiManager.renderMixerChannels();
+            this.uiManager.renderSequencerGrid();
+        });
+    }
+
+    // Global functions for inline event handlers
+    updateChannel(id, property, value) {
+        this.channelManager.updateChannel(id, property, value);
         
-    } catch (error) {
-        console.error('Export error:', error);
-        alert('Export error: ' + error.message);
-        showLoadingIndicator(false);
-        
-        // Restore volume
-        Tone.Destination.volume.value = originalVolume;
-        
-        // Resume playback if it was playing before error
+        // Only re-render mixer if volume or mute changed (avoid unnecessary re-renders)
+        if (property === 'volume' || property === 'muted') {
+            requestAnimationFrame(() => {
+                this.uiManager.renderMixerChannels();
+            });
+        }
+    }
+
+    removeChannel(id) {
+        // Pause playback to prevent stuck notes
+        const wasPlaying = this.sequencer.getIsPlaying();
         if (wasPlaying) {
-            Tone.Transport.start();
-            startSequencer();
-            isPlaying = true;
+            Tone.Transport.stop();
+            this.sequencer.stopSequencer();
+            this.sequencer.isPlaying = false;
+            // Release all notes from all instruments
+            this.channelManager.releaseAllNotes();
         }
-    }
-}
-
-async function convertAndDownloadMP3(webmBlob) {
-    showLoadingIndicator(true, 'Converting to MP3...');
-    
-    try {
-        const mp3Blob = await convertToMp3(webmBlob);
-        const url = URL.createObjectURL(mp3Blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `music-${Date.now()}.mp3`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
         
-        // Clean up after a delay
-        setTimeout(() => URL.revokeObjectURL(url), 100);
+        // Save state for undo
+        this.saveUndoState();
         
-        alert('✅ Recording downloaded successfully!');
-    } catch (error) {
-        console.error('MP3 conversion failed:', error);
-        console.log('Downloading as WebM instead...');
-        
-        const url = URL.createObjectURL(webmBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `music-${Date.now()}.webm`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        setTimeout(() => URL.revokeObjectURL(url), 100);
-        
-        alert('⚠️ Downloaded as WebM format (MP3 conversion not available)');
-    } finally {
-        showLoadingIndicator(false);
-    }
-}
-
-async function convertToMp3(webmBlob) {
-    return new Promise((resolve, reject) => {
-        const fileReader = new FileReader();
-        fileReader.onload = async function() {
-            try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const audioBuffer = await audioContext.decodeAudioData(this.result);
-                const channels = audioBuffer.numberOfChannels;
-                const sampleRate = audioBuffer.sampleRate;
-                const samples = audioBuffer.length;
-                const left = audioBuffer.getChannelData(0);
-                const right = channels > 1 ? audioBuffer.getChannelData(1) : left;
-                const leftPCM = floatTo16BitPCM(left);
-                const rightPCM = floatTo16BitPCM(right);
-                const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 128);
-                const mp3Data = [];
-                const sampleBlockSize = 1152;
-                for (let i = 0; i < samples; i += sampleBlockSize) {
-                    const leftChunk = leftPCM.subarray(i, i + sampleBlockSize);
-                    const rightChunk = rightPCM.subarray(i, i + sampleBlockSize);
-                    const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
-                    if (mp3buf.length > 0) mp3Data.push(mp3buf);
-                }
-                const mp3buf = mp3encoder.flush();
-                if (mp3buf.length > 0) mp3Data.push(mp3buf);
-                const mp3Blob = new Blob(mp3Data, { type: 'audio/mp3' });
-                resolve(mp3Blob);
-            } catch (error) { reject(error); }
-        };
-        fileReader.onerror = (error) => reject(error);
-        fileReader.readAsArrayBuffer(webmBlob);
-    });
-}
-
-function floatTo16BitPCM(float32Array) {
-    const int16Array = new Int16Array(float32Array.length);
-    for (let i = 0; i < float32Array.length; i++) {
-        const s = Math.max(-1, Math.min(1, float32Array[i]));
-        int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-    }
-    return int16Array;
-}
-
-// Undo/Redo functionality
-function saveUndoState() {
-    const state = {
-        channels: JSON.parse(JSON.stringify(channels.map(ch => ({
-            id: ch.id,
-            name: ch.name,
-            instrumentType: ch.instrumentType,
-            waveType: ch.waveType,
-            volume: ch.volume,
-            muted: ch.muted,
-            attack: ch.attack,
-            release: ch.release,
-            pattern: ch.pattern
-        })))),
-        selectedChannelId,
-        gridSize,
-        barCount
-    };
-    
-    undoStack.push(state);
-    if (undoStack.length > MAX_UNDO_STACK) {
-        undoStack.shift();
-    }
-    redoStack = []; // Clear redo stack on new action
-}
-
-function undo() {
-    if (undoStack.length === 0) {
-        // Silent fail for better UX
-        return;
-    }
-    
-    // Save current state to redo stack
-    const currentState = {
-        channels: JSON.parse(JSON.stringify(channels.map(ch => ({
-            id: ch.id,
-            name: ch.name,
-            instrumentType: ch.instrumentType,
-            waveType: ch.waveType,
-            volume: ch.volume,
-            muted: ch.muted,
-            attack: ch.attack,
-            release: ch.release,
-            pattern: ch.pattern
-        })))),
-        selectedChannelId,
-        gridSize,
-        barCount
-    };
-    redoStack.push(currentState);
-    
-    // Restore previous state
-    const state = undoStack.pop();
-    restoreState(state);
-}
-
-function redo() {
-    if (redoStack.length === 0) {
-        // Silent fail for better UX
-        return;
-    }
-    
-    // Save current state to undo stack
-    saveUndoState();
-    
-    // Restore redo state
-    const state = redoStack.pop();
-    restoreState(state);
-}
-
-function restoreState(state) {
-    // This is a simplified restore - in production you'd need to recreate instruments
-    selectedChannelId = state.selectedChannelId;
-    gridSize = state.gridSize;
-    barCount = state.barCount;
-    
-    // Update patterns only (instruments remain)
-    state.channels.forEach(savedChannel => {
-        const channel = channels.find(ch => ch.id === savedChannel.id);
-        if (channel) {
-            channel.pattern = savedChannel.pattern;
-            channel.volume = savedChannel.volume;
-            channel.muted = savedChannel.muted;
-        }
-    });
-    
-    updateLoopEnd();
-    
-    // Batch all UI updates together
-    requestAnimationFrame(() => {
-        renderChannels();
-        renderMixerChannels();
-        renderSequencerGrid();
-    });
-}
-
-function clearPattern() {
-    const channel = channels.find(c => c.id === selectedChannelId);
-    if (!channel) {
-        alert('Please select a channel first');
-        return;
-    }
-    
-    if (confirm(`Clear all patterns for "${channel.name}"?`)) {
-        saveUndoState();
-        const totalSteps = getTotalSteps();
-        channel.pattern = Array(totalSteps).fill(null).map(() => ({}));
+        this.channelManager.removeChannel(id);
         
         // Use requestAnimationFrame to prevent lag
         requestAnimationFrame(() => {
-            renderSequencerGrid();
+            this.uiManager.renderChannels();
+            this.uiManager.renderMixerChannels();
+            this.uiManager.renderSequencerGrid();
         });
-    }
-}
-
-// Loading indicator
-function showLoadingIndicator(show, message = 'Loading...') {
-    let indicator = document.getElementById('loadingIndicator');
-    
-    if (show) {
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.id = 'loadingIndicator';
-            indicator.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(0, 0, 0, 0.9);
-                color: white;
-                padding: 30px 50px;
-                border-radius: 15px;
-                z-index: 2000;
-                font-size: 1.2em;
-                text-align: center;
-                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            `;
-            document.body.appendChild(indicator);
-        }
-        indicator.innerHTML = `
-            <div style="margin-bottom: 15px;">
-                <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #667eea; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-            </div>
-            <div>${message}</div>
-        `;
-        indicator.style.display = 'block';
-    } else {
-        if (indicator) {
-            indicator.style.display = 'none';
+        
+        // Resume playback if it was playing
+        if (wasPlaying) {
+            setTimeout(() => {
+                Tone.Transport.start();
+                this.sequencer.startSequencer();
+                this.sequencer.isPlaying = true;
+            }, 100);
         }
     }
 }
 
-// Add CSS animation for loading spinner
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-`;
-document.head.appendChild(style);
+// Initialize the app
+let app;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof Tone === 'undefined') { 
         alert('Tone.js library failed to load. Please check your internet connection.'); 
         return; 
     }
-    init();
+    
+    app = new MusicStudioApp();
+    window.app = app; // Make app globally available for inline handlers
+    
+    // Add spinner styles
+    app.audioManager.addSpinnerStyles();
+    
+    app.init();
 });
