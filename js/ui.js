@@ -487,6 +487,341 @@ class UIManager {
         }, 800);
     }
 
+    loadPreset(presetName) {
+        // Stop playback if playing
+        const wasPlaying = this.sequencer.getIsPlaying();
+        if (wasPlaying) {
+            this.sequencer.stop();
+        }
+
+        // Clear existing channels
+        const channels = [...this.channelManager.getChannels()];
+        channels.forEach(ch => {
+            this.channelManager.removeChannel(ch.id);
+        });
+
+        // Load the selected preset
+        switch(presetName) {
+            case 'demo':
+                this.loadDemoPreset();
+                break;
+            case 'techno':
+                this.loadTechnoPreset();
+                break;
+            case 'lofi':
+                this.loadLofiPreset();
+                break;
+            case 'dubstep':
+                this.loadDubstepPreset();
+                break;
+            case 'house':
+                this.loadHousePreset();
+                break;
+            case 'ambient':
+                this.loadAmbientPreset();
+                break;
+            case 'dnb':
+                this.loadDnBPreset();
+                break;
+            default:
+                return;
+        }
+
+        // Re-render UI
+        requestAnimationFrame(() => {
+            this.renderChannels();
+            this.renderMixerChannels();
+            this.renderSequencerGrid();
+        });
+    }
+
+    loadDemoPreset() {
+        // This is the same as createDemoSetup but without the welcome message
+        const drums = this.channelManager.addChannel('🥁 Drums', 'drums', 'sine');
+        const bass = this.channelManager.addChannel('🔊 Bass', 'bass', 'sine');
+        const lead = this.channelManager.addChannel('✨ Lead', 'synth', 'sawtooth');
+        const pad = this.channelManager.addChannel('🌊 Pad', 'pad', 'sine');
+        
+        if (drums) {
+            drums.pattern[0] = { kick: true };
+            drums.pattern[4] = { kick: true, snare: true, clap: true };
+            drums.pattern[8] = { kick: true };
+            drums.pattern[10] = { snare: true };
+            drums.pattern[12] = { kick: true, snare: true, clap: true };
+            for (let i = 0; i < 16; i++) {
+                if (!drums.pattern[i]) drums.pattern[i] = {};
+                drums.pattern[i].hihat = true;
+            }
+        }
+        
+        if (bass) {
+            bass.pattern[0] = { C3: true };
+            bass.pattern[2] = { C3: true };
+            bass.pattern[4] = { 'D#3': true };
+            bass.pattern[6] = { 'D#3': true };
+            bass.pattern[8] = { F3: true };
+            bass.pattern[10] = { 'D#3': true };
+            bass.pattern[12] = { C3: true };
+            bass.pattern[14] = { G3: true };
+        }
+        
+        if (lead) {
+            lead.pattern[0] = { C4: true };
+            lead.pattern[1] = { 'D#4': true };
+            lead.pattern[2] = { G4: true };
+            lead.pattern[3] = { C5: true };
+            lead.pattern[4] = { G4: true };
+            lead.pattern[5] = { 'D#4': true };
+            lead.pattern[6] = { C4: true };
+            lead.pattern[8] = { F4: true };
+            lead.pattern[9] = { 'G#4': true };
+            lead.pattern[10] = { C5: true };
+            lead.pattern[11] = { 'D#5': true };
+            lead.pattern[12] = { C5: true };
+            lead.pattern[13] = { 'G#4': true };
+            lead.pattern[14] = { F4: true };
+        }
+        
+        if (pad) {
+            pad.pattern[0] = { C4: true, 'D#4': true, G4: true };
+            pad.pattern[8] = { F4: true, 'G#4': true, C5: true };
+        }
+        
+        if (lead) this.selectChannel(lead.id);
+    }
+
+    loadTechnoPreset() {
+        const drums = this.channelManager.addChannel('🥁 Techno Drums', 'drums', 'sine');
+        const bass = this.channelManager.addChannel('🔊 Acid Bass', 'acidbass', 'sine');
+        const lead = this.channelManager.addChannel('⚡ FM Lead', 'fmsynth', 'sine');
+        
+        if (drums) {
+            // Four on the floor kick
+            for (let i = 0; i < 16; i += 4) {
+                drums.pattern[i] = { kick: true };
+            }
+            // Off-beat hihat
+            for (let i = 2; i < 16; i += 4) {
+                drums.pattern[i] = { hihat: true };
+            }
+            // Snare on 2 and 4
+            drums.pattern[4] = { ...drums.pattern[4], snare: true };
+            drums.pattern[12] = { ...drums.pattern[12], snare: true };
+        }
+        
+        if (bass) {
+            // Acid bassline
+            bass.pattern[0] = { C3: true };
+            bass.pattern[3] = { C3: true };
+            bass.pattern[6] = { 'D#3': true };
+            bass.pattern[9] = { F3: true };
+            bass.pattern[12] = { 'G#3': true };
+            bass.pattern[14] = { G3: true };
+        }
+        
+        if (lead) {
+            // Aggressive stabs
+            lead.pattern[4] = { C5: true };
+            lead.pattern[6] = { 'D#5': true };
+            lead.pattern[12] = { G5: true };
+        }
+        
+        if (drums) this.selectChannel(drums.id);
+    }
+
+    loadLofiPreset() {
+        const drums = this.channelManager.addChannel('🥁 Lo-fi Drums', 'drums', 'sine');
+        const bass = this.channelManager.addChannel('🎸 Upright Bass', 'uprightbass', 'sine');
+        const keys = this.channelManager.addChannel('🎹 E-Piano', 'epiano', 'sine');
+        const vibe = this.channelManager.addChannel('🎵 Vibraphone', 'vibraphone', 'sine');
+        
+        if (drums) {
+            // Laid back beat
+            drums.pattern[0] = { kick: true };
+            drums.pattern[6] = { snare: true };
+            drums.pattern[8] = { kick: true };
+            drums.pattern[14] = { snare: true };
+            // Shuffled hihat
+            drums.pattern[0] = { ...drums.pattern[0], hihat: true };
+            drums.pattern[3] = { hihat: true };
+            drums.pattern[6] = { ...drums.pattern[6], hihat: true };
+            drums.pattern[9] = { hihat: true };
+            drums.pattern[12] = { hihat: true };
+        }
+        
+        if (bass) {
+            // Walking bassline
+            bass.pattern[0] = { E3: true };
+            bass.pattern[4] = { A3: true };
+            bass.pattern[8] = { D3: true };
+            bass.pattern[12] = { G3: true };
+        }
+        
+        if (keys) {
+            // Jazzy chords
+            keys.pattern[0] = { E4: true, 'G#4': true, B4: true }; // E major
+            keys.pattern[8] = { D4: true, 'F#4': true, A4: true }; // D major
+        }
+        
+        if (vibe) {
+            // Melodic embellishment
+            vibe.pattern[2] = { B4: true };
+            vibe.pattern[5] = { 'C#5': true };
+            vibe.pattern[10] = { A4: true };
+            vibe.pattern[13] = { 'F#4': true };
+        }
+        
+        if (keys) this.selectChannel(keys.id);
+    }
+
+    loadDubstepPreset() {
+        const drums = this.channelManager.addChannel('🥁 Heavy Drums', 'drums', 'sine');
+        const bass = this.channelManager.addChannel('💥 Wobble Bass', 'bass', 'sine');
+        const lead = this.channelManager.addChannel('⚡ Synth Lead', 'fmsynth', 'sine');
+        
+        if (drums) {
+            // Half-time drums
+            drums.pattern[0] = { kick: true };
+            drums.pattern[8] = { kick: true, snare: true };
+            // Complex hihat pattern
+            for (let i = 0; i < 16; i += 2) {
+                drums.pattern[i] = { ...drums.pattern[i], hihat: true };
+            }
+            drums.pattern[4] = { ...drums.pattern[4], clap: true };
+            drums.pattern[12] = { ...drums.pattern[12], clap: true };
+        }
+        
+        if (bass) {
+            // Wobble pattern
+            bass.pattern[0] = { E3: true };
+            bass.pattern[1] = { E3: true };
+            bass.pattern[2] = { F3: true };
+            bass.pattern[3] = { E3: true };
+            bass.pattern[8] = { G3: true };
+            bass.pattern[9] = { G3: true };
+            bass.pattern[10] = { 'G#3': true };
+            bass.pattern[11] = { G3: true };
+        }
+        
+        if (lead) {
+            // Aggressive lead hits
+            lead.pattern[4] = { C5: true, 'D#5': true };
+            lead.pattern[12] = { G5: true, A5: true };
+        }
+        
+        if (bass) this.selectChannel(bass.id);
+    }
+
+    loadHousePreset() {
+        const drums = this.channelManager.addChannel('🥁 House Drums', 'drums', 'sine');
+        const bass = this.channelManager.addChannel('🔊 Deep Bass', 'bass', 'sine');
+        const pad = this.channelManager.addChannel('🌊 Warm Pad', 'pad', 'sine');
+        const pluck = this.channelManager.addChannel('🎸 Pluck', 'pluck', 'sine');
+        
+        if (drums) {
+            // Four on the floor
+            for (let i = 0; i < 16; i += 4) {
+                drums.pattern[i] = { kick: true };
+            }
+            // Open hihat pattern
+            for (let i = 0; i < 16; i += 2) {
+                drums.pattern[i] = { ...drums.pattern[i], hihat: true };
+            }
+            // Claps on 2 and 4
+            drums.pattern[4] = { ...drums.pattern[4], clap: true };
+            drums.pattern[12] = { ...drums.pattern[12], clap: true };
+        }
+        
+        if (bass) {
+            // Pumping bassline
+            bass.pattern[0] = { A3: true };
+            bass.pattern[8] = { F3: true };
+        }
+        
+        if (pad) {
+            // Warm chords
+            pad.pattern[0] = { A3: true, C4: true, E4: true }; // Am
+            pad.pattern[8] = { F3: true, A3: true, C4: true }; // F
+        }
+        
+        if (pluck) {
+            // Melodic plucks
+            pluck.pattern[2] = { E4: true };
+            pluck.pattern[5] = { A4: true };
+            pluck.pattern[10] = { C5: true };
+            pluck.pattern[13] = { E5: true };
+        }
+        
+        if (pad) this.selectChannel(pad.id);
+    }
+
+    loadAmbientPreset() {
+        const pad1 = this.channelManager.addChannel('🌊 Deep Pad', 'pad', 'sine');
+        const pad2 = this.channelManager.addChannel('✨ Bright Pad', 'pad', 'triangle');
+        const vibe = this.channelManager.addChannel('🎵 Vibraphone', 'vibraphone', 'sine');
+        
+        if (pad1) {
+            // Long sustained chords
+            pad1.pattern[0] = { C3: true, E3: true, G3: true };
+            pad1.pattern[8] = { D3: true, 'F#3': true, A3: true };
+        }
+        
+        if (pad2) {
+            // Higher voicing
+            pad2.pattern[0] = { G4: true, C5: true, E5: true };
+            pad2.pattern[8] = { A4: true, D5: true, 'F#5': true };
+        }
+        
+        if (vibe) {
+            // Sparse melodic notes
+            vibe.pattern[4] = { E5: true };
+            vibe.pattern[9] = { G5: true };
+            vibe.pattern[14] = { C5: true };
+        }
+        
+        if (pad1) this.selectChannel(pad1.id);
+    }
+
+    loadDnBPreset() {
+        const drums = this.channelManager.addChannel('🥁 DnB Drums', 'drums', 'sine');
+        const bass = this.channelManager.addChannel('🔊 Reese Bass', 'bass', 'sine');
+        const lead = this.channelManager.addChannel('⚡ Amen Break', 'synth', 'sawtooth');
+        
+        if (drums) {
+            // Fast breakbeat pattern
+            drums.pattern[0] = { kick: true };
+            drums.pattern[2] = { snare: true };
+            drums.pattern[4] = { kick: true };
+            drums.pattern[6] = { snare: true };
+            drums.pattern[8] = { kick: true };
+            drums.pattern[10] = { snare: true };
+            drums.pattern[12] = { kick: true };
+            drums.pattern[14] = { snare: true };
+            // Rapid hihat
+            for (let i = 0; i < 16; i++) {
+                drums.pattern[i] = { ...drums.pattern[i], hihat: true };
+            }
+        }
+        
+        if (bass) {
+            // Deep rolling bassline
+            bass.pattern[0] = { 'D#2': true };
+            bass.pattern[3] = { E2: true };
+            bass.pattern[6] = { F2: true };
+            bass.pattern[8] = { 'F#2': true };
+            bass.pattern[11] = { F2: true };
+            bass.pattern[14] = { E2: true };
+        }
+        
+        if (lead) {
+            // Stab hits
+            lead.pattern[4] = { 'A#4': true };
+            lead.pattern[12] = { 'D#5': true };
+        }
+        
+        if (drums) this.selectChannel(drums.id);
+    }
+
     getKeyboardMap() {
         return this.keyboardMap;
     }

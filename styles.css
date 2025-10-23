@@ -104,6 +104,35 @@ body {
     align-items: center;
 }
 
+.presets-dropdown {
+    padding: 10px 15px;
+    background: linear-gradient(135deg, #4a4a5a, #3a3a4a);
+    border: 2px solid #667eea;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.95em;
+    outline: none;
+}
+
+.presets-dropdown:hover {
+    background: linear-gradient(135deg, #5a5a6a, #4a4a5a);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    transform: translateY(-2px);
+}
+
+.presets-dropdown:focus {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
+
+.presets-dropdown option {
+    background: #2d2d3a;
+    color: white;
+}
+
 .btn-export { 
     padding: 10px 25px; 
     background: linear-gradient(135deg, #48bb78, #38a169); 

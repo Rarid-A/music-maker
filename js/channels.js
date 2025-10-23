@@ -178,12 +178,6 @@ class ChannelManager {
         const index = this.channels.findIndex(ch => ch.id === id);
         if (index === -1) return;
         
-        // Edge case: Don't allow removing the last channel
-        if (this.channels.length === 1) {
-            alert('Cannot remove the last channel. Keep at least one channel in your project.');
-            return;
-        }
-        
         const channel = this.channels[index];
         
         try {

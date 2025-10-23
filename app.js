@@ -56,6 +56,21 @@ class MusicStudioApp {
             this.uiManager.showInstrumentDialog();
         });
         
+        // Presets dropdown
+        document.getElementById('presetsDropdown')?.addEventListener('change', async (e) => {
+            const presetValue = e.target.value;
+            if (presetValue) {
+                await this.audioManager.startAudio();
+                
+                if (confirm(`Load "${e.target.options[e.target.selectedIndex].text}" preset? This will clear your current work.`)) {
+                    this.uiManager.loadPreset(presetValue);
+                }
+                
+                // Reset dropdown to default
+                e.target.value = '';
+            }
+        });
+        
         // Prevent default behavior to avoid scrolling when focused
         document.getElementById('tempoInput')?.addEventListener('input', (e) => {
             const value = parseInt(e.target.value);
