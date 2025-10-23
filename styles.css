@@ -576,6 +576,16 @@ footer a:hover {
     text-decoration: underline;
 }
 
+/* Start Overlay Button Hover */
+#startAudioBtn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+}
+
+#startAudioBtn:active {
+    transform: translateY(-1px) scale(1.02);
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
     .piano {

@@ -35,15 +35,35 @@ const keyboardMap = {
 // INITIALIZATION
 // ============================================================
 
-async function init() {
+let audioStarted = false;
+
+async function startAudio() {
+    if (audioStarted) return;
+    
+    console.log('🎵 Starting audio context...');
+    
+    try {
+        await Tone.start();
+        console.log('✅ Audio context started');
+        audioStarted = true;
+        
+        // Hide the start overlay
+        const overlay = document.getElementById('startOverlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+        
+    } catch (error) {
+        console.error('❌ Audio start failed:', error);
+        alert('Error starting audio: ' + error.message);
+    }
+}
+
+function init() {
     console.log('🎵 Initializing Music Maker...');
     
     try {
-        // Wait for audio context to start
-        await Tone.start();
-        console.log('✅ Audio context started');
-        
-        // Setup recording FIRST to capture the audio context
+        // Setup recording
         setupRecording();
         
         // Create the synth
@@ -56,8 +76,7 @@ async function init() {
         Tone.Transport.bpm.value = currentTempo;
         Tone.Transport.start();
         
-        console.log('✅ Music Maker ready!');
-        alert('🎵 Music Maker is ready!\n\nClick piano keys or press:\nA-K: White keys\nW,E,T,Y,U: Black keys');
+        console.log('✅ Music Maker ready! Waiting for user interaction...');
         
     } catch (error) {
         console.error('❌ Initialization failed:', error);
@@ -102,7 +121,9 @@ function createSynth() {
 // Setup recording - connect Tone output to MediaStream
 function setupRecording() {
     try {
-        audioContext = Tone.getContext().rawContext;
+        // Get the audio context (will be created even if not started yet)
+        const toneContext = Tone.getContext();
+        audioContext = toneContext.rawContext || toneContext._context;
         
         // Create a MediaStreamDestination to capture audio
         mediaStreamDestination = audioContext.createMediaStreamDestination();
@@ -122,6 +143,13 @@ function setupRecording() {
 function setupEventListeners() {
     console.log('Setting up event listeners...');
     
+    // START AUDIO BUTTON
+    const startAudioBtn = document.getElementById('startAudioBtn');
+    if (startAudioBtn) {
+        startAudioBtn.addEventListener('click', startAudio);
+        console.log('✅ Start audio button ready');
+    }
+    
     // INSTRUMENT SELECTOR
     const instrumentSelect = document.getElementById('instrumentSelect');
     if (instrumentSelect) {
@@ -131,38 +159,40 @@ function setupEventListeners() {
             createSynth();
         });
         console.log('✅ Instrument selector ready');
+    } else {
+        console.error('❌ Instrument selector not found');
     }
     
     // TEMPO SLIDER
     const tempoSlider = document.getElementById('tempoSlider');
-    if (tempoSlider) {
+    const tempoDisplay = document.getElementById('tempoDisplay');
+    if (tempoSlider && tempoDisplay) {
         tempoSlider.addEventListener('input', (e) => {
             currentTempo = parseInt(e.target.value);
-            const display = document.getElementById('tempoDisplay');
-            if (display) {
-                display.textContent = currentTempo;
-            }
+            tempoDisplay.textContent = currentTempo;
             Tone.Transport.bpm.value = currentTempo;
             console.log('Tempo changed to:', currentTempo, 'BPM');
         });
         console.log('✅ Tempo slider ready');
+    } else {
+        console.error('❌ Tempo slider or display not found');
     }
     
     // VOLUME SLIDER
     const volumeSlider = document.getElementById('volumeSlider');
-    if (volumeSlider) {
+    const volumeDisplay = document.getElementById('volumeDisplay');
+    if (volumeSlider && volumeDisplay) {
         volumeSlider.addEventListener('input', (e) => {
             currentVolume = parseFloat(e.target.value);
-            const display = document.getElementById('volumeDisplay');
-            if (display) {
-                display.textContent = Math.round(currentVolume * 100) + '%';
-            }
+            volumeDisplay.textContent = Math.round(currentVolume * 100) + '%';
             if (synth) {
                 synth.volume.value = -6 + (currentVolume * 12);
+                console.log('Volume changed to:', currentVolume, '| Synth volume:', synth.volume.value);
             }
-            console.log('Volume changed to:', currentVolume);
         });
         console.log('✅ Volume slider ready');
+    } else {
+        console.error('❌ Volume slider or display not found');
     }
     
     // LOOP DURATION
@@ -177,37 +207,40 @@ function setupEventListeners() {
     
     // ATTACK SLIDER
     const attackSlider = document.getElementById('attackSlider');
-    if (attackSlider) {
+    const attackDisplay = document.getElementById('attackDisplay');
+    if (attackSlider && attackDisplay) {
         attackSlider.addEventListener('input', (e) => {
             currentAttack = parseInt(e.target.value);
-            const display = document.getElementById('attackDisplay');
-            if (display) {
-                display.textContent = currentAttack;
-            }
+            attackDisplay.textContent = currentAttack;
             createSynth();
-            console.log('Attack changed to:', currentAttack);
+            console.log('Attack changed to:', currentAttack, 'ms');
         });
         console.log('✅ Attack slider ready');
+    } else {
+        console.error('❌ Attack slider or display not found');
     }
     
     // RELEASE SLIDER
     const releaseSlider = document.getElementById('decaySlider');
-    if (releaseSlider) {
+    const releaseDisplay = document.getElementById('decayDisplay');
+    if (releaseSlider && releaseDisplay) {
         releaseSlider.addEventListener('input', (e) => {
             currentRelease = parseInt(e.target.value);
-            const display = document.getElementById('decayDisplay');
-            if (display) {
-                display.textContent = currentRelease;
-            }
+            releaseDisplay.textContent = currentRelease;
             createSynth();
-            console.log('Release changed to:', currentRelease);
+            console.log('Release changed to:', currentRelease, 'ms');
         });
         console.log('✅ Release slider ready');
+    } else {
+        console.error('❌ Release slider or display not found');
     }
     
     // PIANO KEYS
     document.querySelectorAll('.white-key, .black-key').forEach((key) => {
-        key.addEventListener('mousedown', () => {
+        key.addEventListener('mousedown', async () => {
+            // Start audio on first interaction
+            await startAudio();
+            
             const note = key.getAttribute('data-note');
             if (note && synth) {
                 console.log('Played note:', note);
@@ -222,7 +255,7 @@ function setupEventListeners() {
     // KEYBOARD INPUT
     const pressedKeys = new Set();
     
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', async (e) => {
         const key = e.key.toLowerCase();
         
         // Prevent repeat firing
@@ -230,14 +263,19 @@ function setupEventListeners() {
         pressedKeys.add(key);
         
         const note = keyboardMap[key];
-        if (note && synth) {
-            console.log('Keyboard note:', note);
-            synth.triggerAttackRelease(note, '8n');
+        if (note) {
+            // Start audio on first interaction
+            await startAudio();
             
-            // Visual feedback
-            const keyElement = document.querySelector(`[data-note="${note}"]`);
-            if (keyElement) {
-                keyElement.classList.add('active');
+            if (synth) {
+                console.log('Keyboard note:', note);
+                synth.triggerAttackRelease(note, '8n');
+                
+                // Visual feedback
+                const keyElement = document.querySelector(`[data-note="${note}"]`);
+                if (keyElement) {
+                    keyElement.classList.add('active');
+                }
             }
         }
     });
@@ -421,5 +459,14 @@ function clearRecording() {
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing...');
+    
+    // Check if Tone.js is loaded
+    if (typeof Tone === 'undefined') {
+        console.error('❌ Tone.js not loaded!');
+        alert('Error: Tone.js library failed to load. Please check your internet connection and refresh the page.');
+        return;
+    }
+    
+    console.log('✅ Tone.js loaded, version:', Tone.version);
     init();
 });
