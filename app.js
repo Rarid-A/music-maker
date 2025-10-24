@@ -2,10 +2,13 @@
 class MusicStudioApp {
     constructor() {
         this.audioManager = new AudioManager();
+        this.effectsManager = new EffectsManager();
         this.channelManager = new ChannelManager(this.audioManager);
+        this.channelManager.setEffectsManager(this.effectsManager);
         this.sequencer = new Sequencer(this.channelManager);
         this.uiManager = new UIManager(this.channelManager, this.sequencer);
         this.exportManager = new ExportManager(this.audioManager, this.channelManager, this.sequencer);
+        this.projectManager = new ProjectManager(this.channelManager, this.sequencer, this.effectsManager);
         
         // Undo/Redo functionality
         this.undoStack = [];
@@ -60,10 +63,18 @@ class MusicStudioApp {
         document.getElementById('presetsDropdown')?.addEventListener('change', async (e) => {
             const presetValue = e.target.value;
             if (presetValue) {
-                await this.audioManager.startAudio();
+                // Stop playback BEFORE showing confirm dialog
+                if (this.sequencer.getIsPlaying()) {
+                    this.sequencer.stop();
+                }
                 
                 if (confirm(`Load "${e.target.options[e.target.selectedIndex].text}" preset? This will clear your current work.`)) {
+                    // Load the preset
                     this.uiManager.loadPreset(presetValue);
+                } else {
+                    // User cancelled - restart if it was playing
+                    // (optional: uncomment if you want music to resume on cancel)
+                    // await this.sequencer.togglePlay();
                 }
                 
                 // Reset dropdown to default
@@ -80,6 +91,11 @@ class MusicStudioApp {
                 this.sequencer.setTempo(clampedValue);
                 e.target.value = clampedValue;
             }
+        });
+        
+        document.getElementById('swingInput')?.addEventListener('input', (e) => {
+            const swing = parseInt(e.target.value) / 100; // Convert 0-66 to 0-0.66
+            this.sequencer.setSwing(swing);
         });
         
         document.getElementById('gridSelect')?.addEventListener('change', (e) => {
@@ -123,6 +139,23 @@ class MusicStudioApp {
         document.getElementById('playBtn')?.addEventListener('click', () => this.sequencer.togglePlay());
         document.getElementById('stopBtn')?.addEventListener('click', () => this.sequencer.stop());
         document.getElementById('exportBtn')?.addEventListener('click', () => this.exportManager.exportLoop());
+        document.getElementById('exportMidiBtn')?.addEventListener('click', () => this.exportManager.exportMIDI());
+        document.getElementById('saveProjectBtn')?.addEventListener('click', () => this.projectManager.exportProject());
+        document.getElementById('loadProjectBtn')?.addEventListener('click', () => this.projectManager.importProject());
+        
+        // Toggle piano keyboard visibility
+        document.getElementById('togglePianoBtn')?.addEventListener('click', () => {
+            const pianoKeyboard = document.querySelector('.piano-keyboard');
+            const toggleBtn = document.getElementById('togglePianoBtn');
+            
+            if (pianoKeyboard) {
+                pianoKeyboard.classList.toggle('collapsed');
+                const isCollapsed = pianoKeyboard.classList.contains('collapsed');
+                if (toggleBtn) {
+                    toggleBtn.textContent = isCollapsed ? '🎹 Show Piano' : '🎹 Hide Piano';
+                }
+            }
+        });
         
         document.getElementById('guideToggle')?.addEventListener('click', () => {
             document.getElementById('guideOverlay')?.classList.toggle('hidden');
@@ -195,6 +228,20 @@ class MusicStudioApp {
                 e.preventDefault();
                 this.sequencer.clearPattern();
                 this.uiManager.renderSequencerGrid();
+                return;
+            }
+            
+            // Ctrl+C - Copy pattern
+            if (e.ctrlKey && e.key === 'c' && !e.shiftKey) {
+                e.preventDefault();
+                this.sequencer.copyPattern();
+                return;
+            }
+            
+            // Ctrl+V - Paste pattern
+            if (e.ctrlKey && e.key === 'v' && !e.shiftKey) {
+                e.preventDefault();
+                this.sequencer.pastePattern();
                 return;
             }
             

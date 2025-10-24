@@ -219,7 +219,9 @@ body {
 .left-panel, .right-panel { 
     background: #252530; 
     display: flex; 
-    flex-direction: column; 
+    flex-direction: column;
+    overflow: hidden; /* Prevent panel overflow */
+    max-height: calc(100vh - 80px); /* Limit height to viewport minus header */
 }
 
 .left-panel {
@@ -236,7 +238,8 @@ body {
     align-items: center;
     padding: 15px; 
     background: #2d2d3a; 
-    border-bottom: 2px solid #667eea; 
+    border-bottom: 2px solid #667eea;
+    flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 .panel-header h2 { 
@@ -268,8 +271,9 @@ body {
     overflow-y: auto; 
     overflow-x: hidden; 
     padding: 10px;
+    padding-bottom: 30px; /* Extra space at bottom for visibility */
     /* Ensure scrolling works properly */
-    min-height: 0;
+    min-height: 0; /* Critical for flex scrolling */
     max-height: 100%;
 }
 
@@ -398,6 +402,27 @@ body {
     align-items: center;
 }
 
+.btn-toggle-piano {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-toggle-piano:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-toggle-piano:active {
+    transform: translateY(0);
+}
+
 .piano-roll-controls label {
     font-size: 0.9em;
     color: #ccc;
@@ -481,6 +506,11 @@ body {
     padding: 20px 15px; 
     border-top: 2px solid #667eea;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+.piano-keyboard.collapsed {
+    display: none;
 }
 
 .keyboard-label {
@@ -574,11 +604,12 @@ body {
 
 .mixer-channels { 
     padding: 10px; 
+    padding-bottom: 30px; /* Extra space at bottom for visibility */
     overflow-y: auto; 
     overflow-x: hidden; 
     flex: 1;
     /* Ensure scrolling works properly */
-    min-height: 0;
+    min-height: 0; /* Critical for flex scrolling */
     max-height: 100%;
 }
 
@@ -736,6 +767,113 @@ body {
 
 .hidden { 
     display: none !important; 
+}
+
+/* Instrument Selection Dialog */
+.instrument-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2500;
+}
+
+.instrument-dialog-content {
+    background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+    padding: 30px;
+    padding-bottom: 40px; /* Extra space at bottom for visibility */
+    border-radius: 15px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    max-width: 700px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.instrument-dialog-content h3 {
+    color: #fff;
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.instrument-category {
+    margin-bottom: 20px;
+}
+
+.instrument-category h4 {
+    color: #667eea;
+    font-size: 0.9em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.instrument-select {
+    width: 100%;
+    background: #1a1a2e;
+    color: #fff;
+    border: 2px solid #667eea;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 0.95em;
+    cursor: pointer;
+    outline: none;
+}
+
+.instrument-select option {
+    padding: 8px;
+    cursor: pointer;
+}
+
+.instrument-select option:hover {
+    background: #667eea;
+}
+
+.instrument-select:focus {
+    border-color: #764ba2;
+    box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+}
+
+.instrument-dialog-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+    justify-content: center;
+}
+
+.dialog-btn {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+}
+
+.dialog-btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.dialog-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.dialog-btn-secondary {
+    background: #444;
+    color: white;
+}
+
+.dialog-btn-secondary:hover {
+    background: #555;
 }
 
 /* Scrollbar styling */

@@ -31,6 +31,11 @@
                     <input type="number" id="tempoInput" value="120" min="40" max="200" aria-label="Tempo in beats per minute">
                 </div>
                 
+                <div class="tempo-display">
+                    <label for="swingInput">Swing:</label>
+                    <input type="range" id="swingInput" value="0" min="0" max="66" step="1" aria-label="Swing amount" style="width: 80px;">
+                </div>
+                
                 <div class="beat-display" role="status" aria-live="polite" aria-label="Current beat position">
                     <span id="beatCounter">1.1.1</span>
                 </div>
@@ -42,14 +47,20 @@
                     <option value="">📁 Load Preset...</option>
                     <option value="demo">🎵 Demo Beat</option>
                     <option value="techno">🔊 Techno</option>
+                    <option value="trap">🎤 Trap</option>
+                    <option value="synthwave">🌆 Synthwave</option>
+                    <option value="futurebass">🎹 Future Bass</option>
                     <option value="lofi">🎹 Lo-fi Hip Hop</option>
                     <option value="dubstep">💥 Dubstep</option>
                     <option value="house">🏠 House</option>
                     <option value="ambient">🌌 Ambient</option>
                     <option value="dnb">⚡ Drum & Bass</option>
-                    <option value="pokemon">⚡ Pokémon Style</option>
+                    <option value="game">⚡ Game Style</option>
                 </select>
-                <button id="exportBtn" class="btn-export" aria-label="Export loop as MP3">💾 Export Loop</button>
+                <button id="saveProjectBtn" class="btn-export" aria-label="Save project as JSON">💾 Save</button>
+                <button id="loadProjectBtn" class="btn-export" aria-label="Load project from JSON">📂 Load</button>
+                <button id="exportBtn" class="btn-export" aria-label="Export loop as MP3">🎵 Export</button>
+                <button id="exportMidiBtn" class="btn-export" aria-label="Export as MIDI file">🎹 MIDI</button>
                 <button id="guideToggle" class="btn-icon" title="Help" aria-label="Show help guide">❓</button>
             </div>
         </header>
@@ -73,20 +84,25 @@
             <section class="center-panel" aria-label="Pattern sequencer and piano">
                 <div class="panel-header">
                     <h2>🎼 Piano Roll</h2>
-                    <div class="piano-roll-controls">
-                        <label for="gridSelect">Grid:</label>
-                        <select id="gridSelect" aria-label="Note grid resolution">
-                            <option value="16" selected>16th notes (recommended)</option>
-                            <option value="8">8th notes</option>
-                            <option value="4">4th notes</option>
-                        </select>
-                        <label for="barsSelect">Bars:</label>
-                        <select id="barsSelect" aria-label="Number of bars in pattern">
-                            <option value="1" selected>1 bar (16 steps)</option>
-                            <option value="2">2 bars</option>
-                            <option value="4">4 bars</option>
-                            <option value="8">8 bars</option>
-                        </select>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button id="togglePianoBtn" class="btn-toggle-piano" title="Toggle Piano Keyboard" aria-label="Show/Hide Piano Keyboard">
+                            🎹 Hide Piano
+                        </button>
+                        <div class="piano-roll-controls">
+                            <label for="gridSelect">Grid:</label>
+                            <select id="gridSelect" aria-label="Note grid resolution">
+                                <option value="16" selected>16th notes (recommended)</option>
+                                <option value="8">8th notes</option>
+                                <option value="4">4th notes</option>
+                            </select>
+                            <label for="barsSelect">Bars:</label>
+                            <select id="barsSelect" aria-label="Number of bars in pattern">
+                                <option value="1" selected>1 bar (16 steps)</option>
+                                <option value="2">2 bars</option>
+                                <option value="4">4 bars</option>
+                                <option value="8">8 bars</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 
@@ -220,21 +236,46 @@
                 </div>
                 
                 <div class="guide-section">
-                    <h3>6️⃣ Export Your Music</h3>
-                    <p>Click <strong>💾 Export Loop</strong> to download your pattern as an MP3 file. It will record exactly one loop.</p>
+                    <h3>6️⃣ Save & Export</h3>
+                    <ul>
+                        <li><strong>💾 Save</strong> - Save project as JSON file</li>
+                        <li><strong>📂 Load</strong> - Load project from JSON file</li>
+                        <li><strong>🎵 Export</strong> - Export loop as MP3 audio</li>
+                        <li><strong>🎹 MIDI</strong> - Export as MIDI file for use in other DAWs</li>
+                    </ul>
                 </div>
                 
                 <div class="guide-section">
                     <h3>⌨️ Keyboard Shortcuts</h3>
+                    <p><strong>Playback:</strong></p>
                     <ul>
                         <li><strong>Space</strong> - Play/Pause</li>
                         <li><strong>Esc</strong> - Stop</li>
+                    </ul>
+                    <p><strong>Editing:</strong></p>
+                    <ul>
+                        <li><strong>Ctrl+C</strong> - Copy pattern from selected channel</li>
+                        <li><strong>Ctrl+V</strong> - Paste pattern to selected channel</li>
                         <li><strong>Delete</strong> - Clear pattern for selected channel</li>
                         <li><strong>Ctrl+Z</strong> - Undo</li>
                         <li><strong>Ctrl+Shift+Z / Ctrl+Y</strong> - Redo</li>
+                    </ul>
+                    <p><strong>Live Performance:</strong></p>
+                    <ul>
                         <li><strong>A-K</strong> - Play notes (C to C)</li>
                         <li><strong>W, E, T, Y, U</strong> - Black keys (sharps)</li>
                         <li><strong>Z, X, C, V</strong> - Drum sounds (Kick, Snare, HiHat, Clap)</li>
+                    </ul>
+                </div>
+                
+                <div class="guide-section">
+                    <h3>🎛️ Advanced Features</h3>
+                    <ul>
+                        <li><strong>Swing Control</strong> - Add groove/shuffle to your beats</li>
+                        <li><strong>Effects System</strong> - Reverb, delay, and filter built-in</li>
+                        <li><strong>21 Instruments</strong> - From synths to drums to Game-style sounds</li>
+                        <li><strong>8 Genre Presets</strong> - Instant inspiration for your tracks</li>
+                        <li><strong>Copy/Paste Patterns</strong> - Quickly duplicate and modify patterns</li>
                     </ul>
                 </div>
                 
@@ -250,6 +291,63 @@
             </div>
         </div>
 
+        <!-- Instrument Selection Dialog -->
+        <div id="instrumentDialog" class="instrument-dialog hidden" role="dialog" aria-labelledby="instrumentDialogTitle" aria-modal="true">
+            <div class="instrument-dialog-content">
+                <h3 id="instrumentDialogTitle">🎹 Choose Instrument Type</h3>
+                
+                <div class="instrument-category">
+                    <h4>BASIC INSTRUMENTS</h4>
+                    <select id="instrumentSelect" class="instrument-select" size="5">
+                        <option value="1">Synth (Lead/Melody)</option>
+                        <option value="2">Bass (Deep sound)</option>
+                        <option value="3">Pad (Ambient)</option>
+                        <option value="4">Pluck (Guitar-like)</option>
+                        <option value="5">Drums (Percussion)</option>
+                    </select>
+                </div>
+
+                <div class="instrument-category">
+                    <h4>TECHNO/ELECTRONIC</h4>
+                    <select id="instrumentSelectTechno" class="instrument-select" size="5">
+                        <option value="6">Acid Bass (TB-303 style)</option>
+                        <option value="7">FM Synth (Aggressive leads)</option>
+                        <option value="19">Supersaw (EDM/Trance lead)</option>
+                        <option value="20">Reese Bass (DnB bass)</option>
+                        <option value="21">Wobble Bass (Dubstep bass)</option>
+                    </select>
+                </div>
+
+                <div class="instrument-category">
+                    <h4>JAZZ/ACOUSTIC</h4>
+                    <select id="instrumentSelectJazz" class="instrument-select" size="3">
+                        <option value="8">Electric Piano</option>
+                        <option value="9">Vibraphone</option>
+                        <option value="10">Upright Bass</option>
+                    </select>
+                </div>
+
+                <div class="instrument-category">
+                    <h4>GAME/RETRO</h4>
+                    <select id="instrumentSelectRetro" class="instrument-select" size="8">
+                        <option value="11">Square Wave (Chiptune lead)</option>
+                        <option value="12">PWM Bass (Warm bass)</option>
+                        <option value="13">Bell (Bright melody)</option>
+                        <option value="14">Strings (Orchestral pad)</option>
+                        <option value="15">Brass (Punchy brass)</option>
+                        <option value="16">Pizzicato (Plucked strings)</option>
+                        <option value="17">Marimba (Wooden percussion)</option>
+                        <option value="18">Flute (Soft airy)</option>
+                    </select>
+                </div>
+
+                <div class="instrument-dialog-buttons">
+                    <button id="instrumentDialogOk" class="dialog-btn dialog-btn-primary">Add Channel</button>
+                    <button id="instrumentDialogCancel" class="dialog-btn dialog-btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Tone.js Library -->
@@ -260,6 +358,8 @@
     
     <!-- Application Modules -->
     <script src="js/audio.js"></script>
+    <script src="js/effects.js"></script>
+    <script src="js/project.js"></script>
     <script src="js/channels.js"></script>
     <script src="js/sequencer.js"></script>
     <script src="js/ui.js"></script>

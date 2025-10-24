@@ -5,6 +5,11 @@ class ChannelManager {
         this.channels = [];
         this.selectedChannelId = null;
         this.channelIdCounter = 1;
+        this.effectsManager = null; // Will be set from app.js
+    }
+
+    setEffectsManager(effectsManager) {
+        this.effectsManager = effectsManager;
     }
 
     addChannel(name, instrumentType = 'synth', waveType = 'sine') {
@@ -110,7 +115,7 @@ class ChannelManager {
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -6;
         } else if (instrumentType === 'square') {
-            // Square wave lead for chiptune/retro sounds (Pokémon style)
+            // Square wave lead for chiptune/retro sounds (Game style)
             instrument = new Tone.PolySynth(Tone.Synth, {
                 oscillator: { type: 'square' },
                 envelope: { attack: 0.005, decay: 0.1, sustain: 0.4, release: 0.1 }
@@ -118,7 +123,7 @@ class ChannelManager {
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -8;
         } else if (instrumentType === 'pwmbass') {
-            // PWM Bass for deep warm bass lines (Pokémon style)
+            // PWM Bass for deep warm bass lines (Game style)
             instrument = new Tone.MonoSynth({
                 oscillator: { type: 'pwm', modulationFrequency: 2 },
                 envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.2 },
@@ -127,7 +132,7 @@ class ChannelManager {
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -8;
         } else if (instrumentType === 'bell') {
-            // Metallic bell sound for bright melodies (Pokémon style)
+            // Metallic bell sound for bright melodies (Game style)
             instrument = new Tone.PolySynth(Tone.MetalSynth, {
                 frequency: 200,
                 envelope: { attack: 0.001, decay: 0.4, release: 0.8 },
@@ -139,7 +144,7 @@ class ChannelManager {
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -12;
         } else if (instrumentType === 'strings') {
-            // Orchestral string pad (Pokémon style)
+            // Orchestral string pad (Game style)
             instrument = new Tone.PolySynth(Tone.Synth, {
                 oscillator: { type: 'sawtooth' },
                 envelope: { attack: 0.3, decay: 0.4, sustain: 0.7, release: 1.5 }
@@ -147,7 +152,7 @@ class ChannelManager {
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -14;
         } else if (instrumentType === 'brass') {
-            // Punchy brass sound (Pokémon style)
+            // Punchy brass sound (Game style)
             instrument = new Tone.PolySynth(Tone.Synth, {
                 oscillator: { type: 'sawtooth' },
                 envelope: { attack: 0.02, decay: 0.2, sustain: 0.6, release: 0.3 }
@@ -155,7 +160,7 @@ class ChannelManager {
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -10;
         } else if (instrumentType === 'pizzicato') {
-            // Plucked string sound (Pokémon style)
+            // Plucked string sound (Game style)
             instrument = new Tone.PolySynth(Tone.Synth, {
                 oscillator: { type: 'triangle' },
                 envelope: { attack: 0.001, decay: 0.08, sustain: 0.0, release: 0.1 }
@@ -163,7 +168,7 @@ class ChannelManager {
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -8;
         } else if (instrumentType === 'marimba') {
-            // Wooden mallet percussion (Pokémon style)
+            // Wooden mallet percussion (Game style)
             instrument = new Tone.PolySynth(Tone.Synth, {
                 oscillator: { type: 'sine' },
                 envelope: { attack: 0.001, decay: 0.3, sustain: 0.0, release: 0.4 }
@@ -171,13 +176,42 @@ class ChannelManager {
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -10;
         } else if (instrumentType === 'flute') {
-            // Soft airy flute (Pokémon style)
+            // Soft airy flute (Game style)
             instrument = new Tone.PolySynth(Tone.Synth, {
                 oscillator: { type: 'triangle' },
                 envelope: { attack: 0.05, decay: 0.2, sustain: 0.5, release: 0.3 }
             }).toDestination();
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -12;
+        } else if (instrumentType === 'supersaw') {
+            // Supersaw - Massive detuned saw leads for EDM/Trance
+            const chorus = new Tone.Chorus(4, 2.5, 0.5).start();
+            instrument = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.02, decay: 0.3, sustain: 0.7, release: 0.8 }
+            }).chain(chorus, Tone.Destination);
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -12;
+        } else if (instrumentType === 'reesebass') {
+            // Reese Bass - Layered detuned bass for DnB
+            const chorus = new Tone.Chorus(2, 1, 0.3).start();
+            instrument = new Tone.MonoSynth({
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.3 },
+                filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.6, release: 0.2, baseFrequency: 100, octaves: 3 }
+            }).chain(chorus, Tone.Destination);
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -8;
+        } else if (instrumentType === 'wobblebass') {
+            // Wobble Bass - LFO modulated bass for Dubstep
+            const filter = new Tone.AutoFilter({ frequency: 4, type: 'sine', depth: 1, baseFrequency: 200, octaves: 2.6 }).start();
+            instrument = new Tone.MonoSynth({
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3 },
+                filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.2, baseFrequency: 200, octaves: 3 }
+            }).chain(filter, Tone.Destination);
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -6;
         } else if (instrumentType === 'pad') {
             instrument = new Tone.PolySynth(Tone.Synth, {
                 oscillator: { type: 'sine' },
@@ -202,6 +236,11 @@ class ChannelManager {
             }).toDestination();
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -10;
+        }
+        
+        // Create effects chain for this channel
+        if (this.effectsManager) {
+            this.effectsManager.createEffectsChain(id);
         }
         
         const channel = { 
@@ -283,6 +322,11 @@ class ChannelManager {
                     // Regular instruments have a single synth
                     if (channel.synth) channel.synth.dispose();
                 }
+                
+                // Remove effects
+                if (this.effectsManager) {
+                    this.effectsManager.removeEffects(id);
+                }
             }, 50);
         } catch (error) {
             console.error('Error disposing instrument:', error);
@@ -335,7 +379,7 @@ class ChannelManager {
                 channel.synth.volume.value = value ? -Infinity : -20 + (channel.volume * 20);
             } else if (property === 'attack' || property === 'release') {
                 // Only update envelope for instruments that support it (not FM synths, pluck, or special instruments)
-                const supportsEnvelope = ['synth', 'bass', 'pad', 'pluck', 'acidbass', 'uprightbass', 'pwmbass', 'square', 'strings', 'brass', 'pizzicato', 'marimba', 'flute'].includes(channel.instrumentType);
+                const supportsEnvelope = ['synth', 'bass', 'pad', 'pluck', 'acidbass', 'uprightbass', 'pwmbass', 'square', 'strings', 'brass', 'pizzicato', 'marimba', 'flute', 'supersaw', 'reesebass', 'wobblebass'].includes(channel.instrumentType);
                 if (supportsEnvelope && channel.synth.envelope) {
                     try {
                         channel.synth.set({ envelope: { attack: channel.attack / 1000, release: channel.release / 1000 } });
@@ -347,64 +391,96 @@ class ChannelManager {
         }
     }
 
-    playNote(channel, note, time = undefined) {
+    playNote(channel, note, time = undefined, velocity = 0.7, duration = '8n') {
         if (!channel || channel.muted || channel.instrumentType === 'drums') {
             return;
         }
         
         try {
-            if (channel.instrumentType === 'bass' || channel.instrumentType === 'acidbass' || channel.instrumentType === 'uprightbass' || channel.instrumentType === 'pwmbass') {
+            // Use provided duration or default based on instrument type
+            let noteDuration = duration;
+            if (duration === '8n') {
+                // Apply default durations for different instruments
+                if (channel.instrumentType === 'pluck' || channel.instrumentType === 'pizzicato') {
+                    noteDuration = '4n';
+                } else if (channel.instrumentType === 'fmsynth') {
+                    noteDuration = '16n';
+                } else if (channel.instrumentType === 'epiano' || channel.instrumentType === 'bell' || channel.instrumentType === 'marimba') {
+                    noteDuration = '4n';
+                } else if (channel.instrumentType === 'vibraphone' || channel.instrumentType === 'strings' || channel.instrumentType === 'brass' || channel.instrumentType === 'flute') {
+                    noteDuration = '2n';
+                } else if (channel.instrumentType === 'pad') {
+                    noteDuration = '1n';
+                }
+            }
+            
+            if (channel.instrumentType === 'bass' || channel.instrumentType === 'acidbass' || channel.instrumentType === 'uprightbass' || channel.instrumentType === 'pwmbass' || channel.instrumentType === 'reesebass' || channel.instrumentType === 'wobblebass') {
                 // Mono synths for bass sounds
-                channel.synth.triggerAttackRelease(note, '8n', time);
+                channel.synth.triggerAttackRelease(note, noteDuration, time, velocity);
             } else if (channel.instrumentType === 'pluck' || channel.instrumentType === 'pizzicato') {
                 // Pluck needs a different duration for proper sound
-                channel.synth.triggerAttackRelease(note, '4n', time);
+                channel.synth.triggerAttackRelease(note, noteDuration, time, velocity);
             } else if (channel.instrumentType === 'fmsynth') {
                 // FM synth with shorter duration for punchier sound
-                channel.synth.triggerAttackRelease(note, '16n', time);
+                channel.synth.triggerAttackRelease(note, noteDuration, time, velocity);
             } else if (channel.instrumentType === 'epiano') {
                 // Electric piano with medium sustain
-                channel.synth.triggerAttackRelease(note, '4n', time);
+                channel.synth.triggerAttackRelease(note, noteDuration, time, velocity);
             } else if (channel.instrumentType === 'vibraphone') {
                 // Vibraphone with long sustain
-                channel.synth.triggerAttackRelease(note, '2n', time);
+                channel.synth.triggerAttackRelease(note, noteDuration, time, velocity);
             } else if (channel.instrumentType === 'bell' || channel.instrumentType === 'marimba') {
                 // Bell and marimba with medium-long sustain
-                channel.synth.triggerAttackRelease(note, '4n', time);
+                channel.synth.triggerAttackRelease(note, noteDuration, time, velocity);
             } else if (channel.instrumentType === 'strings' || channel.instrumentType === 'brass') {
                 // Strings and brass with longer sustain
-                channel.synth.triggerAttackRelease(note, '2n', time);
+                channel.synth.triggerAttackRelease(note, noteDuration, time, velocity);
             } else if (channel.instrumentType === 'flute') {
                 // Flute with medium sustain
-                channel.synth.triggerAttackRelease(note, '4n', time);
+                channel.synth.triggerAttackRelease(note, noteDuration, time, velocity);
             } else if (channel.instrumentType === 'square') {
                 // Square wave lead for chiptune
-                channel.synth.triggerAttackRelease(note, '8n', time);
+                channel.synth.triggerAttackRelease(note, noteDuration, time, velocity);
             } else {
                 // Default synths and pads
-                channel.synth.triggerAttackRelease(note, '8n', time);
+                channel.synth.triggerAttackRelease(note, noteDuration, time, velocity);
             }
         } catch (error) {
             console.error('Error playing note:', error);
         }
     }
 
-    playDrum(channel, drumType, time = undefined) {
+    playDrum(channel, drumType, time = undefined, velocity = 0.7) {
         if (!channel || channel.muted || channel.instrumentType !== 'drums') return;
         
         try {
+            // Apply velocity to volume
+            const volumeOffset = (velocity - 0.7) * 10; // Convert velocity to dB adjustment
+            
             switch(drumType) {
                 case 'kick':
+                    const kickVol = channel.synth.kick.volume.value;
+                    channel.synth.kick.volume.value = kickVol + volumeOffset;
                     channel.synth.kick.triggerAttackRelease('C1', '8n', time);
+                    setTimeout(() => { channel.synth.kick.volume.value = kickVol; }, 100);
                     break;
                 case 'snare':
+                    const snareVol = channel.synth.snare.volume.value;
+                    channel.synth.snare.volume.value = snareVol + volumeOffset;
                     channel.synth.snare.triggerAttack(time);
+                    setTimeout(() => { channel.synth.snare.volume.value = snareVol; }, 100);
                     break;
                 case 'hihat':
+                    const hihatVol = channel.synth.hihat.volume.value;
+                    channel.synth.hihat.volume.value = hihatVol + volumeOffset;
                     channel.synth.hihat.triggerAttackRelease('16n', time);
+                    setTimeout(() => { channel.synth.hihat.volume.value = hihatVol; }, 100);
                     break;
                 case 'clap':
+                    const clapVol = channel.synth.clap.volume.value;
+                    channel.synth.clap.volume.value = clapVol + volumeOffset;
                     channel.synth.clap.triggerAttack(time);
+                    setTimeout(() => { channel.synth.clap.volume.value = clapVol; }, 100);
                     break;
             }
         } catch (error) {
@@ -418,20 +494,40 @@ class ChannelManager {
             if (channel && channel.synth) {
                 try {
                     if (channel.instrumentType === 'drums') {
-                        // For drums, just stop the synths
-                        if (channel.synth.kick) channel.synth.kick.triggerRelease();
-                        if (channel.synth.snare && channel.synth.snare.noise) {
-                            channel.synth.snare.noise.stop();
+                        // For drums, force stop all synths
+                        if (channel.synth.kick) {
+                            channel.synth.kick.triggerRelease();
+                            if (channel.synth.kick.envelope) {
+                                channel.synth.kick.envelope.cancel();
+                            }
                         }
-                        if (channel.synth.hihat && channel.synth.hihat.noise) {
-                            channel.synth.hihat.noise.stop();
+                        if (channel.synth.snare) {
+                            if (channel.synth.snare.noise) channel.synth.snare.noise.stop();
+                            if (channel.synth.snare.envelope) channel.synth.snare.envelope.cancel();
                         }
-                        if (channel.synth.clap && channel.synth.clap.noise) {
-                            channel.synth.clap.noise.stop();
+                        if (channel.synth.hihat) {
+                            if (channel.synth.hihat.noise) channel.synth.hihat.noise.stop();
+                            if (channel.synth.hihat.envelope) channel.synth.hihat.envelope.cancel();
+                        }
+                        if (channel.synth.clap) {
+                            if (channel.synth.clap.noise) channel.synth.clap.noise.stop();
+                            if (channel.synth.clap.envelope) channel.synth.clap.envelope.cancel();
                         }
                     } else {
-                        // For melodic instruments, release all notes
-                        channel.synth.releaseAll();
+                        // For melodic instruments, release all notes and cancel envelopes
+                        if (channel.synth.releaseAll) {
+                            channel.synth.releaseAll();
+                        }
+                        // Force cancel all envelopes
+                        if (channel.synth.envelope) {
+                            channel.synth.envelope.cancel();
+                        }
+                        // For poly synths, cancel all voices
+                        if (channel.synth._voices) {
+                            channel.synth._voices.forEach(voice => {
+                                if (voice.envelope) voice.envelope.cancel();
+                            });
+                        }
                     }
                 } catch (error) {
                     console.error('Error releasing notes for channel:', channel.name, error);

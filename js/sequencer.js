@@ -8,6 +8,11 @@ class Sequencer {
         this.barCount = 1; // Start with 1 bar for simplicity
         this.isPlaying = false;
         this.currentTempo = 120;
+        this.swingAmount = 0; // 0 = no swing, 0.5 = max swing
+        
+        // Copy/paste functionality
+        this.copiedPattern = null;
+        this.copiedChannelType = null;
         
         // Constants
         this.notes = ['D#5', 'C5', 'B4', 'A#4', 'A4', 'G#4', 'G4', 'F#4', 'F4', 'E4', 'D#4', 'D4', 'C#4', 'C4', 'B3', 'A#3', 'A3', 'G#3', 'G3', 'F#3', 'F3', 'E3', 'D#3', 'D3', 'C#3', 'C3'];
@@ -64,6 +69,13 @@ class Sequencer {
         const noteValue = this.gridSize === 16 ? '16n' : this.gridSize === 8 ? '8n' : '4n';
         
         this.sequencerLoop = new Tone.Loop((time) => {
+            // Apply swing timing on even-numbered steps
+            let swingOffset = 0;
+            if (this.swingAmount > 0 && this.currentStep % 2 === 1) {
+                const sixteenthNote = Tone.Time('16n').toSeconds();
+                swingOffset = sixteenthNote * this.swingAmount;
+            }
+            
             this.channelManager.getChannels().forEach(channel => {
                 if (channel.muted) return; // Skip muted channels
                 
@@ -71,13 +83,16 @@ class Sequencer {
                 if (step && channel.instrumentType === 'drums') {
                     this.drumLabels.forEach(drumType => {
                         if (step[drumType]) {
-                            this.channelManager.playDrum(channel, drumType, time);
+                            const velocity = step[drumType].velocity || 0.7;
+                            this.channelManager.playDrum(channel, drumType, time + swingOffset, velocity);
                         }
                     });
                 } else if (step) {
                     this.notes.forEach(note => {
                         if (step[note]) {
-                            this.channelManager.playNote(channel, note, time);
+                            const velocity = step[note].velocity || 0.7;
+                            const duration = step[note].duration || '8n';
+                            this.channelManager.playNote(channel, note, time + swingOffset, velocity, duration);
                         }
                     });
                 }
@@ -156,14 +171,27 @@ class Sequencer {
     }
 
     stop() {
+        // Immediate stop
         Tone.Transport.stop();
+        Tone.Transport.cancel(); // Cancel all scheduled events
         this.stopSequencer();
         this.isPlaying = false;
+        
+        // Release all notes immediately
+        this.channelManager.releaseAllNotes();
     }
 
     setTempo(tempo) {
         this.currentTempo = Math.max(40, Math.min(200, tempo));
         Tone.Transport.bpm.value = this.currentTempo;
+    }
+
+    setSwing(amount) {
+        this.swingAmount = Math.max(0, Math.min(0.66, amount));
+    }
+
+    getSwing() {
+        return this.swingAmount;
     }
 
     setGridSize(size) {
@@ -212,6 +240,61 @@ class Sequencer {
             const totalSteps = this.getTotalSteps();
             channel.pattern = Array(totalSteps).fill(null).map(() => ({}));
         }
+    }
+
+    copyPattern() {
+        const channel = this.channelManager.getSelectedChannel();
+        if (!channel) {
+            alert('Please select a channel first');
+            return;
+        }
+        
+        // Deep copy the pattern
+        this.copiedPattern = JSON.parse(JSON.stringify(channel.pattern));
+        this.copiedChannelType = channel.instrumentType;
+        
+        console.log('Pattern copied from', channel.name);
+    }
+
+    pastePattern() {
+        const channel = this.channelManager.getSelectedChannel();
+        if (!channel) {
+            alert('Please select a channel first');
+            return;
+        }
+        
+        if (!this.copiedPattern) {
+            alert('No pattern copied! Use Ctrl+C to copy a pattern first.');
+            return;
+        }
+        
+        // Check if we're pasting to a compatible channel type
+        if (this.copiedChannelType !== channel.instrumentType) {
+            const proceed = confirm(
+                `You're pasting from a ${this.copiedChannelType} channel to a ${channel.instrumentType} channel.\n\n` +
+                `This might not work correctly. Continue anyway?`
+            );
+            if (!proceed) return;
+        }
+        
+        // Deep copy the pattern to the current channel
+        const totalSteps = this.getTotalSteps();
+        const newPattern = Array(totalSteps).fill(null).map(() => ({}));
+        
+        // Copy as much as possible
+        const copyLength = Math.min(this.copiedPattern.length, totalSteps);
+        for (let i = 0; i < copyLength; i++) {
+            newPattern[i] = JSON.parse(JSON.stringify(this.copiedPattern[i]));
+        }
+        
+        channel.pattern = newPattern;
+        
+        // Re-render the sequencer grid
+        if (window.app && window.app.uiManager) {
+            window.app.uiManager.renderSequencerGrid();
+        }
+        
+        console.log('Pattern pasted to', channel.name);
     }
 }
 
