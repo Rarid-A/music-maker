@@ -15,6 +15,9 @@ class MusicStudioApp {
         this.redoStack = [];
         this.MAX_UNDO_STACK = 50;
         
+        // Track if initial demo has been loaded
+        this.initialDemoLoaded = false;
+        
         // Make sequencer available globally for channel manager
         window.sequencer = this.sequencer;
     }
@@ -40,8 +43,11 @@ class MusicStudioApp {
             // Start audio context
             await this.audioManager.startAudio();
             
-            // Create demo setup
-            this.uiManager.createDemoSetup();
+            // Create demo setup only if not already loaded
+            if (!this.initialDemoLoaded) {
+                this.uiManager.createDemoSetup();
+                this.initialDemoLoaded = true;
+            }
             
             this.audioManager.showLoadingIndicator(false);
         } catch (error) {
@@ -63,6 +69,12 @@ class MusicStudioApp {
         document.getElementById('presetsDropdown')?.addEventListener('change', async (e) => {
             const presetValue = e.target.value;
             if (presetValue) {
+                // Ensure audio is started
+                await this.audioManager.startAudio();
+                
+                // Mark that initial demo has been loaded (even if we're replacing it)
+                this.initialDemoLoaded = true;
+                
                 // Stop playback BEFORE showing confirm dialog
                 if (this.sequencer.getIsPlaying()) {
                     this.sequencer.stop();
