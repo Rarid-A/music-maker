@@ -109,6 +109,75 @@ class ChannelManager {
             }).toDestination();
             if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
             instrument.volume.value = -6;
+        } else if (instrumentType === 'square') {
+            // Square wave lead for chiptune/retro sounds (Pokémon style)
+            instrument = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'square' },
+                envelope: { attack: 0.005, decay: 0.1, sustain: 0.4, release: 0.1 }
+            }).toDestination();
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -8;
+        } else if (instrumentType === 'pwmbass') {
+            // PWM Bass for deep warm bass lines (Pokémon style)
+            instrument = new Tone.MonoSynth({
+                oscillator: { type: 'pwm', modulationFrequency: 2 },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.2 },
+                filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.4, release: 0.1, baseFrequency: 150, octaves: 2.5 }
+            }).toDestination();
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -8;
+        } else if (instrumentType === 'bell') {
+            // Metallic bell sound for bright melodies (Pokémon style)
+            instrument = new Tone.PolySynth(Tone.MetalSynth, {
+                frequency: 200,
+                envelope: { attack: 0.001, decay: 0.4, release: 0.8 },
+                harmonicity: 8,
+                modulationIndex: 20,
+                resonance: 4000,
+                octaves: 1.5
+            }).toDestination();
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -12;
+        } else if (instrumentType === 'strings') {
+            // Orchestral string pad (Pokémon style)
+            instrument = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.3, decay: 0.4, sustain: 0.7, release: 1.5 }
+            }).toDestination();
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -14;
+        } else if (instrumentType === 'brass') {
+            // Punchy brass sound (Pokémon style)
+            instrument = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.02, decay: 0.2, sustain: 0.6, release: 0.3 }
+            }).toDestination();
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -10;
+        } else if (instrumentType === 'pizzicato') {
+            // Plucked string sound (Pokémon style)
+            instrument = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.001, decay: 0.08, sustain: 0.0, release: 0.1 }
+            }).toDestination();
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -8;
+        } else if (instrumentType === 'marimba') {
+            // Wooden mallet percussion (Pokémon style)
+            instrument = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.001, decay: 0.3, sustain: 0.0, release: 0.4 }
+            }).toDestination();
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -10;
+        } else if (instrumentType === 'flute') {
+            // Soft airy flute (Pokémon style)
+            instrument = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.05, decay: 0.2, sustain: 0.5, release: 0.3 }
+            }).toDestination();
+            if (this.audioManager.getMediaStreamDestination()) instrument.connect(this.audioManager.getMediaStreamDestination());
+            instrument.volume.value = -12;
         } else if (instrumentType === 'pad') {
             instrument = new Tone.PolySynth(Tone.Synth, {
                 oscillator: { type: 'sine' },
@@ -266,7 +335,7 @@ class ChannelManager {
                 channel.synth.volume.value = value ? -Infinity : -20 + (channel.volume * 20);
             } else if (property === 'attack' || property === 'release') {
                 // Only update envelope for instruments that support it (not FM synths, pluck, or special instruments)
-                const supportsEnvelope = ['synth', 'bass', 'pad', 'pluck', 'acidbass', 'uprightbass'].includes(channel.instrumentType);
+                const supportsEnvelope = ['synth', 'bass', 'pad', 'pluck', 'acidbass', 'uprightbass', 'pwmbass', 'square', 'strings', 'brass', 'pizzicato', 'marimba', 'flute'].includes(channel.instrumentType);
                 if (supportsEnvelope && channel.synth.envelope) {
                     try {
                         channel.synth.set({ envelope: { attack: channel.attack / 1000, release: channel.release / 1000 } });
@@ -284,10 +353,10 @@ class ChannelManager {
         }
         
         try {
-            if (channel.instrumentType === 'bass' || channel.instrumentType === 'acidbass' || channel.instrumentType === 'uprightbass') {
+            if (channel.instrumentType === 'bass' || channel.instrumentType === 'acidbass' || channel.instrumentType === 'uprightbass' || channel.instrumentType === 'pwmbass') {
                 // Mono synths for bass sounds
                 channel.synth.triggerAttackRelease(note, '8n', time);
-            } else if (channel.instrumentType === 'pluck') {
+            } else if (channel.instrumentType === 'pluck' || channel.instrumentType === 'pizzicato') {
                 // Pluck needs a different duration for proper sound
                 channel.synth.triggerAttackRelease(note, '4n', time);
             } else if (channel.instrumentType === 'fmsynth') {
@@ -299,6 +368,18 @@ class ChannelManager {
             } else if (channel.instrumentType === 'vibraphone') {
                 // Vibraphone with long sustain
                 channel.synth.triggerAttackRelease(note, '2n', time);
+            } else if (channel.instrumentType === 'bell' || channel.instrumentType === 'marimba') {
+                // Bell and marimba with medium-long sustain
+                channel.synth.triggerAttackRelease(note, '4n', time);
+            } else if (channel.instrumentType === 'strings' || channel.instrumentType === 'brass') {
+                // Strings and brass with longer sustain
+                channel.synth.triggerAttackRelease(note, '2n', time);
+            } else if (channel.instrumentType === 'flute') {
+                // Flute with medium sustain
+                channel.synth.triggerAttackRelease(note, '4n', time);
+            } else if (channel.instrumentType === 'square') {
+                // Square wave lead for chiptune
+                channel.synth.triggerAttackRelease(note, '8n', time);
             } else {
                 // Default synths and pads
                 channel.synth.triggerAttackRelease(note, '8n', time);

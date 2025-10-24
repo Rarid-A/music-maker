@@ -223,7 +223,16 @@ class UIManager {
             '8 - Electric Piano\n' +
             '9 - Vibraphone\n' +
             '10 - Upright Bass\n\n' +
-            'Enter number (1-10):',
+            'POKÉMON/RETRO:\n' +
+            '11 - Square Wave (Chiptune lead)\n' +
+            '12 - PWM Bass (Warm bass)\n' +
+            '13 - Bell (Bright melody)\n' +
+            '14 - Strings (Orchestral pad)\n' +
+            '15 - Brass (Punchy brass)\n' +
+            '16 - Pizzicato (Plucked strings)\n' +
+            '17 - Marimba (Wooden percussion)\n' +
+            '18 - Flute (Soft airy)\n\n' +
+            'Enter number (1-18):',
             '1'
         );
         
@@ -238,8 +247,8 @@ class UIManager {
         }
         
         // Validate input
-        if (!/^([1-9]|10)$/.test(instrumentType.trim())) {
-            alert('Invalid choice. Please enter a number between 1 and 10.');
+        if (!/^([1-9]|1[0-8])$/.test(instrumentType.trim())) {
+            alert('Invalid choice. Please enter a number between 1 and 18.');
             // Resume playback if it was playing
             if (wasPlaying) {
                 Tone.Transport.start();
@@ -259,7 +268,15 @@ class UIManager {
             '7': { type: 'fmsynth', name: 'FM Synth' },
             '8': { type: 'epiano', name: 'E-Piano' },
             '9': { type: 'vibraphone', name: 'Vibraphone' },
-            '10': { type: 'uprightbass', name: 'Upright Bass' }
+            '10': { type: 'uprightbass', name: 'Upright Bass' },
+            '11': { type: 'square', name: 'Square Wave' },
+            '12': { type: 'pwmbass', name: 'PWM Bass' },
+            '13': { type: 'bell', name: 'Bell' },
+            '14': { type: 'strings', name: 'Strings' },
+            '15': { type: 'brass', name: 'Brass' },
+            '16': { type: 'pizzicato', name: 'Pizzicato' },
+            '17': { type: 'marimba', name: 'Marimba' },
+            '18': { type: 'flute', name: 'Flute' }
         };
         
         const selected = types[instrumentType.trim()];
@@ -523,6 +540,9 @@ class UIManager {
             case 'dnb':
                 this.loadDnBPreset();
                 break;
+            case 'pokemon':
+                this.loadPokemonPreset();
+                break;
             default:
                 return;
         }
@@ -536,6 +556,16 @@ class UIManager {
     }
 
     loadDemoPreset() {
+        // Set grid to 16 steps, 1 bar for demo
+        this.sequencer.setGridSize(16);
+        this.sequencer.setBarCount(1);
+        
+        // Update bars select dropdown
+        const barsSelect = document.getElementById('barsSelect');
+        if (barsSelect) {
+            barsSelect.value = '1';
+        }
+        
         // This is the same as createDemoSetup but without the welcome message
         const drums = this.channelManager.addChannel('🥁 Drums', 'drums', 'sine');
         const bass = this.channelManager.addChannel('🔊 Bass', 'bass', 'sine');
@@ -591,6 +621,16 @@ class UIManager {
     }
 
     loadTechnoPreset() {
+        // Set grid to 16 steps, 1 bar
+        this.sequencer.setGridSize(16);
+        this.sequencer.setBarCount(1);
+        
+        // Update bars select dropdown
+        const barsSelect = document.getElementById('barsSelect');
+        if (barsSelect) {
+            barsSelect.value = '1';
+        }
+        
         const drums = this.channelManager.addChannel('🥁 Techno Drums', 'drums', 'sine');
         const bass = this.channelManager.addChannel('🔊 Acid Bass', 'acidbass', 'sine');
         const lead = this.channelManager.addChannel('⚡ FM Lead', 'fmsynth', 'sine');
@@ -630,6 +670,16 @@ class UIManager {
     }
 
     loadLofiPreset() {
+        // Set grid to 16 steps, 1 bar
+        this.sequencer.setGridSize(16);
+        this.sequencer.setBarCount(1);
+        
+        // Update bars select dropdown
+        const barsSelect = document.getElementById('barsSelect');
+        if (barsSelect) {
+            barsSelect.value = '1';
+        }
+        
         const drums = this.channelManager.addChannel('🥁 Lo-fi Drums', 'drums', 'sine');
         const bass = this.channelManager.addChannel('🎸 Upright Bass', 'uprightbass', 'sine');
         const keys = this.channelManager.addChannel('🎹 E-Piano', 'epiano', 'sine');
@@ -675,6 +725,16 @@ class UIManager {
     }
 
     loadDubstepPreset() {
+        // Set grid to 16 steps, 1 bar
+        this.sequencer.setGridSize(16);
+        this.sequencer.setBarCount(1);
+        
+        // Update bars select dropdown
+        const barsSelect = document.getElementById('barsSelect');
+        if (barsSelect) {
+            barsSelect.value = '1';
+        }
+        
         const drums = this.channelManager.addChannel('🥁 Heavy Drums', 'drums', 'sine');
         const bass = this.channelManager.addChannel('💥 Wobble Bass', 'bass', 'sine');
         const lead = this.channelManager.addChannel('⚡ Synth Lead', 'fmsynth', 'sine');
@@ -713,6 +773,16 @@ class UIManager {
     }
 
     loadHousePreset() {
+        // Set grid to 16 steps, 1 bar
+        this.sequencer.setGridSize(16);
+        this.sequencer.setBarCount(1);
+        
+        // Update bars select dropdown
+        const barsSelect = document.getElementById('barsSelect');
+        if (barsSelect) {
+            barsSelect.value = '1';
+        }
+        
         const drums = this.channelManager.addChannel('🥁 House Drums', 'drums', 'sine');
         const bass = this.channelManager.addChannel('🔊 Deep Bass', 'bass', 'sine');
         const pad = this.channelManager.addChannel('🌊 Warm Pad', 'pad', 'sine');
@@ -756,6 +826,16 @@ class UIManager {
     }
 
     loadAmbientPreset() {
+        // Set grid to 16 steps, 1 bar
+        this.sequencer.setGridSize(16);
+        this.sequencer.setBarCount(1);
+        
+        // Update bars select dropdown
+        const barsSelect = document.getElementById('barsSelect');
+        if (barsSelect) {
+            barsSelect.value = '1';
+        }
+        
         const pad1 = this.channelManager.addChannel('🌊 Deep Pad', 'pad', 'sine');
         const pad2 = this.channelManager.addChannel('✨ Bright Pad', 'pad', 'triangle');
         const vibe = this.channelManager.addChannel('🎵 Vibraphone', 'vibraphone', 'sine');
@@ -783,6 +863,16 @@ class UIManager {
     }
 
     loadDnBPreset() {
+        // Set grid to 16 steps, 1 bar
+        this.sequencer.setGridSize(16);
+        this.sequencer.setBarCount(1);
+        
+        // Update bars select dropdown
+        const barsSelect = document.getElementById('barsSelect');
+        if (barsSelect) {
+            barsSelect.value = '1';
+        }
+        
         const drums = this.channelManager.addChannel('🥁 DnB Drums', 'drums', 'sine');
         const bass = this.channelManager.addChannel('🔊 Reese Bass', 'bass', 'sine');
         const lead = this.channelManager.addChannel('⚡ Amen Break', 'synth', 'sawtooth');
@@ -805,12 +895,12 @@ class UIManager {
         
         if (bass) {
             // Deep rolling bassline
-            bass.pattern[0] = { 'D#2': true };
-            bass.pattern[3] = { E2: true };
-            bass.pattern[6] = { F2: true };
-            bass.pattern[8] = { 'F#2': true };
-            bass.pattern[11] = { F2: true };
-            bass.pattern[14] = { E2: true };
+            bass.pattern[0] = { 'D#3': true };
+            bass.pattern[3] = { E3: true };
+            bass.pattern[6] = { F3: true };
+            bass.pattern[8] = { 'F#3': true };
+            bass.pattern[11] = { F3: true };
+            bass.pattern[14] = { E3: true };
         }
         
         if (lead) {
@@ -820,6 +910,98 @@ class UIManager {
         }
         
         if (drums) this.selectChannel(drums.id);
+    }
+
+    loadPokemonPreset() {
+        // Set grid to 16 steps, 2 bars for Pokémon style melody
+        this.sequencer.setGridSize(16);
+        this.sequencer.setBarCount(2);
+        
+        // Update bars select dropdown
+        const barsSelect = document.getElementById('barsSelect');
+        if (barsSelect) {
+            barsSelect.value = '2';
+        }
+        
+        // Create Pokémon-style instruments
+        const square = this.channelManager.addChannel('🎵 Square Lead', 'square', 'square');
+        const pwmbass = this.channelManager.addChannel('🔉 PWM Bass', 'pwmbass', 'pwm');
+        const bell = this.channelManager.addChannel('🔔 Bell', 'bell', 'sine');
+        const strings = this.channelManager.addChannel('🎻 Strings', 'strings', 'sawtooth');
+        const pizzicato = this.channelManager.addChannel('🎸 Pizzicato', 'pizzicato', 'triangle');
+        
+        // Square wave melody (main theme-like melody, 2 bars)
+        if (square) {
+            // Bar 1
+            square.pattern[0] = { E4: true };
+            square.pattern[2] = { 'G#4': true };
+            square.pattern[4] = { B4: true };
+            square.pattern[6] = { 'C#5': true };
+            square.pattern[8] = { B4: true };
+            square.pattern[10] = { 'G#4': true };
+            square.pattern[12] = { E4: true };
+            square.pattern[14] = { 'G#4': true };
+            // Bar 2
+            square.pattern[16] = { A4: true };
+            square.pattern[18] = { 'C#5': true };
+            square.pattern[20] = { E5: true };
+            square.pattern[22] = { 'C#5': true };
+            square.pattern[24] = { A4: true };
+            square.pattern[26] = { 'G#4': true };
+            square.pattern[28] = { 'F#4': true };
+            square.pattern[30] = { E4: true };
+        }
+        
+        // PWM Bass (warm bass foundation)
+        if (pwmbass) {
+            // Bar 1
+            pwmbass.pattern[0] = { E3: true };
+            pwmbass.pattern[4] = { E3: true };
+            pwmbass.pattern[8] = { E3: true };
+            pwmbass.pattern[12] = { E3: true };
+            // Bar 2
+            pwmbass.pattern[16] = { A3: true };
+            pwmbass.pattern[20] = { A3: true };
+            pwmbass.pattern[24] = { A3: true };
+            pwmbass.pattern[28] = { E3: true };
+        }
+        
+        // Bell harmony (bright accents)
+        if (bell) {
+            // Bar 1
+            bell.pattern[4] = { B4: true };
+            bell.pattern[12] = { 'G#4': true };
+            // Bar 2
+            bell.pattern[20] = { E5: true };
+            bell.pattern[28] = { 'F#4': true };
+        }
+        
+        // String pad (orchestral background)
+        if (strings) {
+            // Sustained chords
+            // Bar 1 - E major chord
+            strings.pattern[0] = { E3: true, 'G#3': true, B3: true };
+            strings.pattern[8] = { E3: true, 'G#3': true, B3: true };
+            // Bar 2 - A major then F# minor
+            strings.pattern[16] = { A3: true, 'C#4': true, E4: true };
+            strings.pattern[24] = { 'F#3': true, A3: true, 'C#4': true };
+        }
+        
+        // Pizzicato (plucked accent notes)
+        if (pizzicato) {
+            // Bar 1
+            pizzicato.pattern[2] = { B3: true };
+            pizzicato.pattern[6] = { 'C#4': true };
+            pizzicato.pattern[10] = { B3: true };
+            pizzicato.pattern[14] = { 'G#3': true };
+            // Bar 2
+            pizzicato.pattern[18] = { 'C#4': true };
+            pizzicato.pattern[22] = { E4: true };
+            pizzicato.pattern[26] = { A3: true };
+            pizzicato.pattern[30] = { 'G#3': true };
+        }
+        
+        if (square) this.selectChannel(square.id);
     }
 
     getKeyboardMap() {
